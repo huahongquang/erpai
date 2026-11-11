@@ -1,4 +1,5 @@
 import asyncio, json, os, sqlite3, uuid, secrets
+from urllib.parse import parse_qs
 from datetime import datetime, timezone
 from pathlib import Path
 import httpx
@@ -23,6 +24,24 @@ if len(TOKEN)<24:
         raise RuntimeError('ADMIN_TOKEN must be at least 24 characters')
 
 app=FastAPI(title='AgentSpace ERP API',docs_url=None,redoc_url=None)
+
+# ASGI Middleware to restore original route path from Vercel rewrite query parameter
+class VercelPathMiddleware:
+    def __init__(self, app):
+        self.app = app
+    async def __call__(self, scope, receive, send):
+        if scope["type"] in ("http", "websocket"):
+            qs = parse_qs(scope.get("query_string", b"").decode("latin-1"))
+            if "__path__" in qs and qs["__path__"]:
+                sub = qs["__path__"][0].strip("/")
+                if sub == "ws":
+                    scope["path"] = "/ws"
+                else:
+                    scope["path"] = "/api/" + sub
+        await self.app(scope, receive, send)
+
+app.add_middleware(VercelPathMiddleware)
+
 if (BASE/'static').is_dir():
     app.mount('/static',StaticFiles(directory=BASE/'static'),name='static')
 
@@ -119,14 +138,6 @@ async def home():
     if idx.is_file():
         return FileResponse(idx)
     return RedirectResponse(url='/static/index.html')
-
-@app.api_route("/api/index.py", methods=["GET", "POST", "PUT", "DELETE"])
-async def catch_index_py(request: Request):
-    return {
-        "url_path": request.url.path,
-        "scope_path": request.scope.get("path"),
-        "headers": dict(request.headers),
-    }
 
 @app.get('/erp/readonly/{domain}')
 @app.get('/api/erp/readonly/{domain}')
