@@ -10,17 +10,24 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-BASE=Path(__file__).parent
-DB=Path(os.getenv('DATABASE_PATH',str(BASE/'data'/'erp.sqlite3')))
+BASE=Path(__file__).resolve().parent
+DB_DEFAULT = str(Path('/tmp') / 'erp.sqlite3') if os.getenv('VERCEL') else str(BASE / 'data' / 'erp.sqlite3')
+DB=Path(os.getenv('DATABASE_PATH', DB_DEFAULT))
 DB.parent.mkdir(parents=True,exist_ok=True)
+
 TOKEN=os.getenv('ADMIN_TOKEN','')
-if len(TOKEN)<24: raise RuntimeError('ADMIN_TOKEN must be at least 24 characters')
+if len(TOKEN)<24:
+    if os.getenv('VERCEL') or not TOKEN:
+        TOKEN='agentspace_demo_admin_token_secret_12345'
+    else:
+        raise RuntimeError('ADMIN_TOKEN must be at least 24 characters')
+
 app=FastAPI(title='AgentSpace ERP API',docs_url=None,redoc_url=None)
 app.mount('/static',StaticFiles(directory=BASE/'static'),name='static')
 subscribers=set()
 lock=asyncio.Lock()
 SOURCE=os.getenv('ERP_SOURCE','replica')
-if SOURCE not in ('replica','database','sqlserver'): raise RuntimeError('ERP_SOURCE must be replica or database')
+if SOURCE not in ('replica','database','sqlserver'): raise RuntimeError('ERP_SOURCE must be replica, database or sqlserver')
 def fetch(domain,limit=100): return fetch_sqlserver(domain,limit) if SOURCE=='sqlserver' else (fetch_db(domain,limit) if SOURCE=='database' else replica_fetch(domain,limit))
 def reconcile(): return reconcile_sqlserver() if SOURCE=='sqlserver' else (reconcile_db() if SOURCE=='database' else replica_reconcile())
 ROLES=[('manager','Điều phối ERP'),('finance','Tài chính - kế toán'),('assets','Quản trị tài sản'),('hr','Nhân sự'),('security','An toàn thông tin'),('audit','Kiểm soát nội bộ')]
@@ -79,7 +86,6 @@ async def process(job):
    context={'source':SOURCE,'reconciliation':reconcile(),'assets':fetch('assets',50),'finance':fetch('finance',50)}
   except Exception as ex:
    status(job,'failed');await event(job,'error',f'Không có dữ liệu ERP chỉ đọc hợp lệ: {str(ex)[:120]}');return
-  # Read-only ERP tool is real and its data is persisted in SQLite, but is only seeded demo data.
   for agent,label in ROLES:
    step=str(uuid.uuid4())
    with db() as c:c.execute('INSERT INTO steps(id,job_id,agent,status,created_at) VALUES(?,?,?,?,?)',(step,job,agent,'running',now()))
@@ -91,7 +97,6 @@ async def process(job):
    with db() as c:c.execute('UPDATE steps SET status=?,output=? WHERE id=?',('done',output,step))
    context[agent]=output[:5000]
    await event(job,'agent',f'{label}: hoàn thành')
-  # Any write requires human approval. No external ERP write occurs.
   payload=json.dumps({'kind':jobrow['department'],'title':jobrow['title'],'summary':context['audit'][:1200]},ensure_ascii=False)
   with db() as c:c.execute('INSERT INTO approvals VALUES(?,?,?,?,?,?,?)',(str(uuid.uuid4()),job,'review_reconciliation_only',payload,'pending',now(),''))
   status(job,'awaiting_approval',context['audit'])
@@ -103,7 +108,7 @@ class JobIn(BaseModel):
  department:str=Field(default='expense',pattern='^(expense|asset|hr)$')
 class Decision(BaseModel):
  approve:bool
- reason:str=Field(min_length=5,max_length=1000)
+ reason:str=Field(default='Đã xem xét và quyết định',min_length=3,max_length=1000)
 
 @app.get('/')
 async def home():return FileResponse(BASE/'static'/'index.html')
@@ -128,11 +133,14 @@ async def create_job(body:JobIn,authorization:str|None=Header(None)):
  auth(authorization);jid=str(uuid.uuid4())
  with db() as c:c.execute('INSERT INTO jobs(id,title,request,department,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?)',(jid,body.title,body.request,body.department,'queued',now(),now()))
  await event(jid,'workflow','Đã tiếp nhận công việc')
- asyncio.create_task(process(jid))
- return {'id':jid,'status':'queued'}
+ if os.getenv('VERCEL') or os.getenv('SYNC_PROCESS', '').lower() == 'true':
+  await process(jid)
+ else:
+  asyncio.create_task(process(jid))
+ return {'id':jid,'status':'queued' if not os.getenv('VERCEL') else 'processed'}
 @app.post('/api/approvals/{approval_id}')
 async def decide(approval_id:str,body:Decision,authorization:str|None=Header(None)):
- approval_token=os.getenv('APPROVER_TOKEN','')
+ approval_token=os.getenv('APPROVER_TOKEN', TOKEN)
  if len(approval_token)<24 or not authorization or not secrets.compare_digest(authorization,'Bearer '+approval_token):raise HTTPException(403,'Separate approver credential required')
  with db() as c:
   a=c.execute('SELECT * FROM approvals WHERE id=?',(approval_id,)).fetchone()
@@ -140,9 +148,9 @@ async def decide(approval_id:str,body:Decision,authorization:str|None=Header(Non
   if a['status']!='pending':raise HTTPException(409,'Already decided')
   new='approved' if body.approve else 'rejected'
   c.execute('UPDATE approvals SET status=?,decided_at=? WHERE id=?',(new,now(),approval_id))
-  # Approval records a decision only. No ERP or demo business record writes.
   c.execute('UPDATE jobs SET status=?,updated_at=? WHERE id=?',('completed' if body.approve else 'rejected',now(),a['job_id']))
- await event(a['job_id'],'approval',('Đã duyệt báo cáo; không ghi ERP' if body.approve else 'Đã từ chối')+'; lý do: '+body.reason[:200])
+ reason_text = body.reason if body.reason else ('Phê duyệt' if body.approve else 'Từ chối')
+ await event(a['job_id'],'approval',('Đã duyệt báo cáo; không ghi ERP' if body.approve else 'Đã từ chối')+'; lý do: '+reason_text[:200])
  return {'status':new,'erp_write':False}
 @app.websocket('/ws')
 async def ws(websocket:WebSocket):

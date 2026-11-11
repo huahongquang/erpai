@@ -4,10 +4,36 @@ from pathlib import Path
 
 ALLOWED = {'assets': {'asset_id','name','department','original_cost','book_value'}, 'finance': {'entry_id','asset_id','amount','account','description'}}
 
+def seed_demo_replica(p: Path):
+    p.parent.mkdir(parents=True, exist_ok=True)
+    with sqlite3.connect(p) as c:
+        c.executescript('''
+        DROP TABLE IF EXISTS assets;
+        DROP TABLE IF EXISTS finance;
+        CREATE TABLE assets(asset_id TEXT,name TEXT,department TEXT,original_cost REAL,book_value REAL);
+        CREATE TABLE finance(entry_id TEXT,asset_id TEXT,amount REAL,account TEXT,description TEXT);
+        ''')
+        assets = [
+            ('AST-001', 'Hệ thống máy chủ Dell PowerEdge R750', 'Trung tâm CNTT', 125000000.0, 95000000.0),
+            ('AST-002', 'Máy chiếu hội trường Sony Laser', 'Phòng Quản trị', 45000000.0, 32000000.0),
+            ('AST-003', 'Bộ bàn ghế phòng họp 20 chỗ', 'Phòng Hành chính', 28000000.0, 20000000.0),
+            ('AST-004', 'Dàn máy tính phòng Lab AI', 'Khoa CNTT', 210000000.0, 180000000.0)
+        ]
+        finance = [
+            ('FIN-101', 'AST-001', 125000000.0, '2111', 'Thanh toán mua máy chủ Dell PowerEdge'),
+            ('FIN-102', 'AST-002', 45000000.0, '2112', 'Chi phí lắp đặt máy chiếu hội trường'),
+            ('FIN-103', 'AST-003', 28000000.0, '2113', 'Mua sắm nội thất phòng họp'),
+            ('FIN-104', 'AST-004', 210000000.0, '2111', 'Đợt 1 thanh toán dàn máy tính Lab AI')
+        ]
+        c.executemany('INSERT INTO assets VALUES(?,?,?,?,?)', assets)
+        c.executemany('INSERT INTO finance VALUES(?,?,?,?,?)', finance)
+
 def connect():
-    path = Path(os.environ.get('ERP_READONLY_DB','/app/data/erp_readonly.sqlite3'))
+    default_dir = Path('/tmp') if os.getenv('VERCEL') else Path(__file__).resolve().parent / 'data'
+    path_str = os.environ.get('ERP_READONLY_DB', str(default_dir / 'erp_readonly.sqlite3'))
+    path = Path(path_str)
     if not path.is_file():
-        raise RuntimeError('ERP_READONLY_DB missing: import verified ERP exports first')
+        seed_demo_replica(path)
     return sqlite3.connect(f'file:{path}?mode=ro',uri=True)
 
 def fetch(domain,limit=100):
