@@ -120,14 +120,12 @@ async def home():
         return FileResponse(idx)
     return RedirectResponse(url='/static/index.html')
 
-@app.get('/test-path')
-@app.get('/api/test-path')
-async def test_path(request: Request):
+@app.api_route("/api/index.py", methods=["GET", "POST", "PUT", "DELETE"])
+async def catch_index_py(request: Request):
     return {
         "url_path": request.url.path,
         "scope_path": request.scope.get("path"),
-        "x_matched_path": request.headers.get("x-matched-path"),
-        "x_forwarded_uri": request.headers.get("x-forwarded-uri"),
+        "headers": dict(request.headers),
     }
 
 @app.get('/erp/readonly/{domain}')
