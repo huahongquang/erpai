@@ -114,14 +114,21 @@ class Decision(BaseModel):
 
 @app.get('/')
 @app.get('/index')
-@app.get('/api')
-@app.get('/api/index')
-@app.get('/api/index.py')
 async def home():
     idx = BASE / 'static' / 'index.html'
     if idx.is_file():
         return FileResponse(idx)
     return RedirectResponse(url='/static/index.html')
+
+@app.get('/test-path')
+@app.get('/api/test-path')
+async def test_path(request: Request):
+    return {
+        "url_path": request.url.path,
+        "scope_path": request.scope.get("path"),
+        "x_matched_path": request.headers.get("x-matched-path"),
+        "x_forwarded_uri": request.headers.get("x-forwarded-uri"),
+    }
 
 @app.get('/erp/readonly/{domain}')
 @app.get('/api/erp/readonly/{domain}')
