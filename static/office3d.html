@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<meta name="theme-color" content="#090e19" />
+<title>AgentSpace — Văn phòng ảo 3D cho AI Agents</title>
+<style>
+:root{color-scheme:dark;--bg:#090e19;--panel:#101827;--line:#243146;--muted:#8b9bb1;--text:#ecf3ff;--lime:#c4ff83;--cyan:#80dbff;--violet:#ae9dff;--orange:#ffbc79}
+*{box-sizing:border-box}html,body{padding:0;margin:0;min-height:100%;background:var(--bg);color:var(--text);font:14px/1.5 Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
+body{background-image:radial-gradient(ellipse at 50% -25%,#192f43 0,transparent 58%);overflow-x:hidden}
+button,input,select{font:inherit}button{cursor:pointer}button:disabled{opacity:.4;cursor:not-allowed}
+.app{width:min(100%,1700px);margin:auto;padding:18px 20px 22px}
+.topbar{display:flex;align-items:center;gap:18px;justify-content:space-between;min-height:65px;margin-bottom:15px}
+.brand{display:flex;gap:13px;align-items:center;min-width:0}.brand-logo{height:43px;width:43px;display:grid;place-items:center;border-radius:15px;background:linear-gradient(145deg,#d3ffa0,#77d1bb);box-shadow:0 0 36px #b8ff8a27;color:#0f2519;flex-shrink:0}.brand-logo svg{width:27px;height:27px}
+.brand-name{font-weight:840;letter-spacing:-1px;font-size:23px;line-height:1}.brand-sub{color:var(--muted);font-size:11px;letter-spacing:1.6px;text-transform:uppercase;margin-top:6px;font-weight:740}
+.head-right{display:flex;align-items:center;gap:9px;flex-wrap:wrap;justify-content:flex-end}.chip{display:flex;align-items:center;gap:9px;border:1px solid var(--line);border-radius:999px;background:#101a2c;padding:8px 12px;color:#c7d5e4;font-size:12px;font-weight:600;white-space:nowrap}.dot{height:8px;width:8px;border-radius:50%;background:var(--lime);box-shadow:0 0 12px var(--lime);display:inline-block;flex-shrink:0}.muted-dot{background:#faad70;box-shadow:0 0 8px #faad7088}
+.btn{border-radius:11px;padding:10px 14px;border:1px solid #35445a;color:#dde8f6;background:#172337;font-weight:700;transition:.16s ease;display:inline-flex;gap:8px;align-items:center;justify-content:center;white-space:nowrap}.btn:hover{background:#233651;border-color:#66809c}.btn.primary{background:var(--lime);color:#192519;border-color:var(--lime)}.btn.primary:hover{background:#e1ffba}.btn.small{font-size:12px;padding:7px 10px;border-radius:9px}.btn.ghost{background:#142034aa}.btn.ghost:hover{background:#27364d}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 332px;gap:15px;align-items:stretch}
+.mainpanel,.sidebar,.logpanel{border:1px solid var(--line);background:#101929d9;border-radius:20px;min-width:0;overflow:hidden;box-shadow:0 18px 65px #05091038}
+.mainpanel{display:flex;flex-direction:column}.scene-top{padding:18px 20px 14px;display:flex;align-items:flex-start;justify-content:space-between;gap:14px}.eyebrow{font-size:10px;font-weight:800;letter-spacing:2.0px;color:#81b2d3;text-transform:uppercase}.scene-title{font-size:19px;letter-spacing:-.5px;font-weight:760;margin-top:3px}.legend{display:flex;flex-wrap:wrap;gap:12px;justify-content:flex-end;padding-top:8px}.legend span{color:#bdcad7;font-size:11px;white-space:nowrap}.legend i{display:inline-block;height:7px;width:7px;border-radius:50%;vertical-align:1px;margin-right:5px}
+.scene-wrap{position:relative;min-height:530px;height:clamp(490px,58vw,680px);overflow:hidden;background:radial-gradient(ellipse at 52% 44%,#192b40 0%,#0a1526 58%,#081221 100%);border-top:1px solid #243044;border-bottom:1px solid #233145;touch-action:none}
+.scene-wrap:before{content:"";position:absolute;inset:0;pointer-events:none;z-index:1;opacity:.4;background:radial-gradient(circle at center,transparent 48%,#060d1a 110%)}
+#world{position:absolute;inset:0;width:100%;height:100%;display:block;outline:none;cursor:grab;touch-action:none}#world.grabbing{cursor:grabbing}
+.scene-hint{position:absolute;z-index:2;left:17px;bottom:16px;font-size:11px;background:#0e1a2bd5;border:1px solid #34465b;border-radius:10px;padding:8px 11px;color:#99aec6;pointer-events:none;backdrop-filter:blur(12px)}
+.scene-badge{position:absolute;z-index:2;right:17px;top:17px;padding:7px 11px;font-size:10px;letter-spacing:1.3px;font-weight:830;color:#c1ffc9;border:1px solid #69ca963f;background:#14352b98;border-radius:8px;pointer-events:none}
+#labels{position:absolute;inset:0;pointer-events:none;z-index:3}.world-label{position:absolute;transform:translate(-50%,-100%);border:1px solid #40566d;background:#0b1626e8;color:#dce9f8;white-space:nowrap;border-radius:9px;padding:5px 8px 5px 7px;box-shadow:0 6px 20px #0008;font-size:11px;font-weight:740;display:flex;gap:7px;align-items:center;pointer-events:auto;cursor:pointer;transition:background .18s,border .18s}.world-label:hover,.world-label.selected{border-color:var(--lime);background:#223a39}.label-dot{width:7px;height:7px;border-radius:50%;background:var(--status);box-shadow:0 0 7px var(--status)}.world-label .label-task{font-size:9px;color:#8aa0b6;font-weight:540}.label-content{display:flex;flex-direction:column;line-height:1.2}.label-content strong{font-size:11px}
+.scene-toolbar{display:flex;padding:13px 17px;gap:9px;flex-wrap:wrap;align-items:center}.toolbar-spacer{flex:1}.toolbar-label{color:#8ea2b7;font-size:11px;font-weight:700;margin-right:4px}.tool-ic{font-size:16px;line-height:1}
+.sidebar{display:flex;flex-direction:column}.side-head{padding:20px 19px 10px}.side-title{font-size:17px;font-weight:790;letter-spacing:-.3px;margin-top:5px}.side-count{color:#90a4b9;font-size:12px;margin-top:2px}.agent-list{padding:5px 10px 15px;display:flex;flex-direction:column;gap:6px;overflow-y:auto;max-height:356px}.agent-row{display:flex;align-items:center;gap:11px;width:100%;text-align:left;background:transparent;border:1px solid transparent;border-radius:13px;color:#e5eff8;padding:10px;transition:.18s}.agent-row:hover{background:#1c2b3e}.agent-row.active{background:#1c3041;border-color:#40727a}.avatar-icon{width:36px;height:36px;flex-shrink:0;border-radius:12px;background:var(--agentBG);color:var(--agentColor);display:grid;place-items:center;font-weight:900;font-size:12px;border:1px solid #ffffff18}.agent-meta{min-width:0;flex:1}.agent-name{font-size:12px;font-weight:770;display:flex;justify-content:space-between;gap:5px}.agent-role{font-size:11px;color:#8ca1b6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px}.agent-state{font-size:10px;color:var(--scolor);font-weight:720;white-space:nowrap;padding-left:3px}
+.detail{border-top:1px solid var(--line);padding:20px 19px 18px;background:linear-gradient(145deg,#152435d0,#111a29)}.detail-head{display:flex;justify-content:space-between;gap:6px;align-items:center}.detail h3{margin:0;font-size:15px}.status-tag{border:1px solid var(--stbd);color:var(--stcolor);background:var(--stbg);border-radius:7px;font-size:10px;font-weight:790;padding:4px 8px}.detail-description{font-size:12px;line-height:1.65;color:#8ba0b4;margin:10px 0 14px;min-height:37px}.subhead{color:#83a0b8;font-size:10px;letter-spacing:1.2px;font-weight:850;text-transform:uppercase}.task-name{font-weight:720;font-size:12px;margin:7px 0 11px;min-height:30px}.progress-top{display:flex;justify-content:space-between;color:#9cacc0;font-size:11px;margin-bottom:7px}.progress-top b{color:#dbeefa}.progress{height:7px;background:#26354b;border-radius:10px;overflow:hidden}.progress>div{height:100%;background:linear-gradient(90deg,#76c6ad,#c5ff8e);border-radius:10px;transition:width .4s}.assign{display:flex;gap:7px;margin-top:16px}.task-input{flex:1;min-width:0;border:1px solid #35465e;border-radius:9px;background:#0b1727;color:#e8f6ff;padding:10px 9px;font-size:12px;outline:none}.task-input:focus,.urlinput:focus{border-color:#9bccda}.task-input::placeholder{color:#697d93}
+.bottom{margin-top:15px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr)) 1.25fr;gap:15px}.kpi,.logpanel{background:#111a29db;border:1px solid var(--line);border-radius:15px;padding:17px 19px}.kpi span{display:block;font-size:11px;color:#90a5b9;font-weight:680;margin-bottom:4px}.kpi strong{display:block;line-height:1.2;font-size:26px;letter-spacing:-.8px}.kpi small{font-size:11px;color:#7794a8}.kpi em{font-style:normal;font-size:12px;font-weight:750;color:var(--lime)}.kpi-left{display:flex;gap:11px;align-items:center}.kpi-icon{width:39px;height:39px;border-radius:13px;display:grid;place-items:center;background:#284344;font-size:19px}.kpi:nth-child(2) .kpi-icon{background:#293452}.kpi:nth-child(3) .kpi-icon{background:#443527}
+.logpanel{padding:13px 16px;min-height:97px}.loghead{display:flex;align-items:center;justify-content:space-between}.loghead b{font-size:12px}.loghead small{font-size:10px;color:#7792aa}.logs{margin-top:8px;height:69px;overflow-y:auto;scrollbar-width:thin}.logentry{font-size:10.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#9bafc0;padding:2px 0}.logentry strong{color:#ccdcf0;font-weight:740}.logentry time{font-variant-numeric:tabular-nums;color:#637d95;padding-right:7px}
+.footer{display:flex;justify-content:space-between;gap:12px;padding:17px 4px;color:#647f96;font-size:11px;flex-wrap:wrap}.footer b{color:#9aadc0}
+.modal-backdrop{position:fixed;inset:0;z-index:30;display:none;align-items:center;justify-content:center;padding:20px;background:#030810d8;backdrop-filter:blur(7px)}.modal-backdrop.show{display:flex}.modal{background:#132035;border:1px solid #3c5266;border-radius:20px;max-width:560px;width:100%;box-shadow:0 25px 95px #000b;padding:23px}.modalhead{display:flex;justify-content:space-between;align-items:center;gap:10px}.modalhead h2{font-size:19px;margin:0}.close{background:#26374a;color:#fff;border:1px solid #3f5263;border-radius:10px;width:32px;height:32px}.modal p{color:#9eb1c4;font-size:13px;line-height:1.7}.modal label{display:block;color:#afc4d6;margin-bottom:6px;font-size:11px;font-weight:800}.urlrow{display:flex;gap:8px}.urlinput{min-width:0;flex:1;color:white;background:#0c1626;border:1px solid #384b61;border-radius:10px;padding:11px;outline:0}.connection-status{font-size:11px;color:#a9b9cb;margin-top:9px}.code-sample{font:11px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;background:#0a1423;border:1px solid #263c54;border-radius:10px;padding:12px;white-space:pre-wrap;word-break:break-word;color:#c7f6db;margin-top:13px}.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:15px}.help-row{font-size:11px;color:#95abc1;margin-top:15px}
+.no-webgl{position:absolute;inset:0;z-index:3;display:none;align-items:center;justify-content:center;padding:30px;color:#ffd1b7;text-align:center;background:#101b2b}
+@media (max-width:1120px){.bottom{grid-template-columns:repeat(3,1fr)}.logpanel{grid-column:1 / -1}.layout{grid-template-columns:minmax(0,1fr) 292px}.scene-wrap{height:540px}}
+@media (max-width:860px){.app{padding:11px}.topbar{flex-wrap:wrap;gap:11px}.layout{grid-template-columns:1fr}.sidebar{display:grid;grid-template-columns:1fr 1fr}.side-head{grid-column:1 / -1;padding:16px 16px 7px}.agent-list{max-height:282px;padding:5px 8px 12px}.detail{border-top:0;border-left:1px solid var(--line);padding:17px}.scene-wrap{height:480px;min-height:420px}.head-right .chip{display:none}}
+@media(max-width:580px){.brand-name{font-size:20px}.brand-logo{width:39px;height:39px}.brand-sub{font-size:9px}.head-right{width:100%;justify-content:space-between}.topbar{margin-bottom:10px}.scene-top{padding:13px 13px 11px;flex-direction:column;gap:4px}.legend{padding:0;gap:10px}.scene-title{font-size:16px}.scene-wrap{height:410px;min-height:380px}.scene-toolbar{padding:11px;gap:6px}.scene-toolbar .btn{font-size:11px;padding:8px}.toolbar-spacer,.toolbar-label{display:none}.scene-hint{font-size:10px;max-width:80%;left:9px;bottom:9px;padding:6px}.sidebar{display:flex}.side-head{padding:15px 15px 8px}.agent-list{max-height:240px;display:grid;grid-template-columns:1fr 1fr;padding:5px 8px 12px;gap:3px}.agent-row{padding:7px;gap:6px}.agent-state{display:none}.avatar-icon{width:30px;height:30px}.agent-name{font-size:11px}.agent-role{font-size:10px}.detail{border-top:1px solid var(--line);border-left:0}.bottom{grid-template-columns:repeat(3,1fr);gap:7px}.kpi{padding:10px 9px}.kpi-icon{display:none}.kpi span{font-size:10px}.kpi strong{font-size:21px}.kpi small{font-size:9px}.footer{font-size:10px}.modal{padding:17px}.urlrow{flex-direction:column}.world-label{font-size:10px;padding:4px}.world-label .label-task{font-size:8px}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-logo"><svg viewBox="0 0 30 30" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17 15 4l11 13-11 9z"/><path d="M9 15.5h12M15 10v11"/></svg></div>
+      <div><div class="brand-name">Agent<span style="color:#c7ff94">Space</span></div><div class="brand-sub">VIRTUAL AI WORKSPACE / 3D</div></div>
+    </div>
+    <div class="head-right"><div class="chip"><span class="dot" id="liveDot"></span><span id="connIndicator">CHẾ ĐỘ DEMO</span></div><div class="chip">● <span id="currentClock"></span></div><button class="btn" id="exportBtn">↓ Xuất trạng thái</button><button class="btn primary" id="openConnectBtn">◉ Kết nối agent</button></div>
+  </header>
+  <div class="layout">
+    <section class="mainpanel">
+      <div class="scene-top"><div><div class="eyebrow">World 01 · Headquarters</div><div class="scene-title">Văn phòng điều hành AI</div></div><div class="legend"><span><i style="background:#c4ff83"></i>Đang làm</span><span><i style="background:#80dbff"></i>Đang họp</span><span><i style="background:#ffc388"></i>Chờ</span><span><i style="background:#aa9aff"></i>Hoàn thành</span></div></div>
+      <div class="scene-wrap" id="sceneWrap"><canvas id="world" aria-label="Văn phòng 3D tương tác. Kéo để xoay, lăn để phóng to, chọn agent để xem chi tiết." tabindex="0"></canvas><div id="labels"></div><div class="scene-badge">● 3D LIVE VIEW</div><div class="scene-hint">🖱 Kéo để xoay · Cuộn để thu phóng · Chạm agent để chọn</div><div class="no-webgl" id="noWebgl">Trình duyệt này không hỗ trợ WebGL2. Hãy thử mở bằng Chrome, Edge hoặc Safari phiên bản mới.</div></div>
+      <div class="scene-toolbar"><span class="toolbar-label">ĐIỀU KHIỂN</span><button class="btn small primary" id="meetingBtn"><span class="tool-ic">♧</span><span id="meetingBtnText">Họp nhanh</span></button><button class="btn small" id="pauseBtn"><span class="tool-ic" id="pauseIcon">Ⅱ</span><span id="pauseText">Tạm dừng</span></button><button class="btn small ghost" id="resetViewBtn"><span class="tool-ic">⌖</span>Góc nhìn</button><button class="btn small ghost" id="resetAllBtn"><span class="tool-ic">↻</span>Đặt lại demo</button><div class="toolbar-spacer"></div><span style="font-size:10px;color:#7d93a8" id="sceneMode">◌ 6 AGENTS TRỰC TUYẾN</span></div>
+    </section>
+    <aside class="sidebar"><div class="side-head"><div class="eyebrow">Team directory</div><div class="side-title">Đội ngũ AI agents</div><div class="side-count" id="agentCount">6 agent · Giám sát theo thời gian thực</div></div><div class="agent-list" id="agentList"></div><div class="detail"><div class="detail-head"><h3 id="detailName">Agent</h3><span id="detailStatus" class="status-tag">Đang làm</span></div><div class="detail-description" id="detailDescription"></div><div class="subhead">Nhiệm vụ hiện tại</div><div class="task-name" id="detailTask"></div><div class="progress-top"><span>Tiến độ</span><b id="detailProgress">0%</b></div><div class="progress"><div id="progressBar" style="width:0%"></div></div><div class="assign"><input class="task-input" id="newTask" maxlength="140" placeholder="Giao nhiệm vụ mới..." aria-label="Nhiệm vụ mới"/><button class="btn small primary" id="assignBtn">Giao việc</button></div></div></aside>
+  </div>
+  <div class="bottom"><div class="kpi"><div class="kpi-left"><div class="kpi-icon">◈</div><div><span>Tổng AI agents</span><strong id="kpiTotal">06</strong><small>Không gian làm việc số</small></div></div></div><div class="kpi"><div class="kpi-left"><div class="kpi-icon">↗</div><div><span>Đang thực thi</span><strong id="kpiWorking">04</strong><small><em id="kpiWorkRate">67%</em> đang hoạt động</small></div></div></div><div class="kpi"><div class="kpi-left"><div class="kpi-icon">✦</div><div><span>TB tiến độ</span><strong id="kpiProgress">0%</strong><small>Nhiệm vụ đã giao</small></div></div></div><div class="logpanel"><div class="loghead"><b>Nhật ký hoạt động</b><small id="logMode">SIMULATED EVENTS</small></div><div class="logs" id="logs"></div></div></div>
+  <div class="footer"><span>AGENTSPACE · BẢN DEMO ĐỘC LẬP · <b>WebGL 3D</b></span><span>Chưa kết nối mô hình AI thực tế · Có hỗ trợ WebSocket</span></div>
+</div>
+<div class="modal-backdrop" id="connectModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle"><div class="modal"><div class="modalhead"><h2 id="modalTitle">Kết nối AI agents thực tế</h2><button class="close" id="closeModalBtn" aria-label="Đóng">✕</button></div><p>Cung cấp địa chỉ <b>WebSocket</b> của hệ thống điều phối agent. Văn phòng sẽ cập nhật trạng thái, tiến độ và vị trí theo sự kiện được gửi đến. Không cần sửa giao diện.</p><label for="socketUrl">WEBSOCKET ENDPOINT</label><div class="urlrow"><input class="urlinput" id="socketUrl" value="ws://localhost:8765" spellcheck="false" aria-label="Địa chỉ WebSocket"/><button class="btn primary" id="connectBtn">Kết nối</button><button class="btn ghost" id="disconnectBtn">Ngắt</button></div><div style="display:flex;gap:8px;margin:12px 0"><input id="realTaskPrompt" class="urlinput" placeholder="Giao nhiệm vụ thật cho các AI agent..." style="flex:1"><button class="btn primary" id="sendRealTask">Giao việc AI</button></div><div class="connection-status" id="connectionStatus">Chưa kết nối. Hiện đang dùng dữ liệu mô phỏng.</div><div class="code-sample">// Ví dụ thông điệp JSON từ hệ thống AI orchestration:
+{
+  "type": "agent_update",
+  "id": "dev",
+  "name": "Dev Agent",
+  "status": "working",
+  "task": "Xây dựng API khách hàng",
+  "progress": 72
+}</div><div class="help-row">Trạng thái hỗ trợ: <b>working</b>, <b>meeting</b>, <b>idle</b>, <b>done</b>. Có thể gửi <b>agent_add</b>, <b>agent_remove</b> và <b>log</b>.</div><div class="modal-actions"><button class="btn ghost" id="closeModalBottom">Đóng</button></div></div></div>
+<script>
+(()=>{'use strict';
+const $ = id=>document.getElementById(id);
+const initialAgents = [
+ {id:'lead',name:'Lead Agent',role:'Điều phối & quản lý',initial:'LD',color:'#c5fb9b',status:'working',task:'Lập kế hoạch công việc hôm nay',progress:78,speed:.42,x:-5.05,z:-2.65,desc:'Điều phối công việc, phân bổ nguồn lực và tổng hợp kết quả từ các agent.'},
+ {id:'research',name:'Research Agent',role:'Nghiên cứu & phân tích',initial:'RS',color:'#82c9fa',status:'working',task:'Nghiên cứu xu hướng thị trường',progress:46,speed:.28,x:0,z:-2.85,desc:'Thu thập, đối chiếu nguồn thông tin và tạo báo cáo nghiên cứu.'},
+ {id:'dev',name:'Dev Agent',role:'Phát triển phần mềm',initial:'DV',color:'#b6a1ff',status:'working',task:'Phát triển backend & tích hợp API',progress:63,speed:.24,x:5.05,z:-2.65,desc:'Viết mã, kiểm thử tích hợp và xây dựng chức năng sản phẩm.'},
+ {id:'design',name:'Design Agent',role:'Thiết kế & trải nghiệm',initial:'DS',color:'#ffbb8b',status:'working',task:'Thiết kế giao diện dashboard',progress:34,speed:.32,x:-5.05,z:2.75,desc:'Thiết kế UI/UX, nguyên mẫu trực quan và hướng dẫn giao diện.'},
+ {id:'marketing',name:'Marketing Agent',role:'Nội dung & tăng trưởng',initial:'MK',color:'#ff96ca',status:'idle',task:'Chờ nhận kế hoạch chiến dịch',progress:0,speed:.29,x:0,z:3.05,desc:'Lên chiến lược nội dung, SEO, kế hoạch truyền thông và quảng bá.'},
+ {id:'qa',name:'QA Agent',role:'Kiểm thử & đánh giá',initial:'QA',color:'#82f0d8',status:'done',task:'Hoàn tất bộ kiểm thử regression',progress:100,speed:.22,x:5.05,z:2.75,desc:'Kiểm tra chất lượng đầu ra và ghi nhận lỗi trước khi bàn giao.'}
+];
+const cloneInitial=()=>initialAgents.map(a=>({...a,posX:a.x,posZ:a.z,animation:Math.random()*7}));
+let agents=cloneInitial(),selected='lead',running=true,meeting=false,meetingEnd=0,ws=null,wsConnected=false,liveExternal=false,logs=[],lastTick=performance.now(),lastUi=0,lastSnapshot=0;
+let orbit={yaw:Math.PI*.245,elev:.66,dist:23,targetX:0,targetY:.85,targetZ:0},isDragging=false,dragDistance=0,priorPointer=null;
+const statusInfo={working:{label:'Đang làm',color:'#c4ff83',bg:'#28472b55'},meeting:{label:'Đang họp',color:'#80dbff',bg:'#26476255'},idle:{label:'Chờ việc',color:'#ffbd7b',bg:'#51392355'},done:{label:'Hoàn thành',color:'#b6a5ff',bg:'#46386a55'},error:{label:'Lỗi',color:'#ff858d',bg:'#622d3b55'}};
+const logTime=()=>new Intl.DateTimeFormat('vi-VN',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(new Date());
+function escapeHTML(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function addLog(text,source='Hệ thống'){logs.unshift({text:String(text),source,time:logTime()});logs=logs.slice(0,35);renderLogs();}
+function renderLogs(){$('logs').innerHTML=logs.slice(0,9).map(l=>`<div class="logentry"><time>${l.time}</time><strong>${escapeHTML(l.source)}:</strong> ${escapeHTML(l.text)}</div>`).join('');}
+function activeAgent(){return agents.find(a=>a.id===selected)||agents[0];}
+function renderAgentList(){
+ $('agentList').innerHTML=agents.map(a=>{const st=statusInfo[a.status]||statusInfo.idle;return `<button class="agent-row ${a.id===selected?'active':''}" data-id="${escapeHTML(a.id)}" style="--agentBG:${a.color}1c;--agentColor:${a.color};--scolor:${st.color}"><span class="avatar-icon">${escapeHTML(a.initial)}</span><span class="agent-meta"><span class="agent-name">${escapeHTML(a.name)}</span><span class="agent-role">${escapeHTML(a.role)}</span></span><span class="agent-state">● ${st.label}</span></button>`;}).join('');
+ document.querySelectorAll('.agent-row').forEach(el=>el.addEventListener('click',()=>selectAgent(el.dataset.id)));
+}
+function updateDetail(){const a=activeAgent();if(!a)return;const st=statusInfo[a.status]||statusInfo.idle;$('detailName').textContent=a.name;$('detailDescription').textContent=a.desc;$('detailTask').textContent=a.task||'Chưa được giao việc';$('detailProgress').textContent=`${Math.round(a.progress)}%`;$('progressBar').style.width=`${Math.max(0,Math.min(100,a.progress))}%`;const badge=$('detailStatus');badge.textContent=st.label;badge.style.cssText=`--stbd:${st.color}72;--stcolor:${st.color};--stbg:${st.bg}`;}
+function updateKpis(){const n=agents.length,work=agents.filter(a=>a.status==='working').length,avg=n?Math.round(agents.reduce((s,a)=>s+a.progress,0)/n):0;$('agentCount').textContent=`${n} agent · Giám sát theo thời gian thực`;$('kpiTotal').textContent=String(n).padStart(2,'0');$('kpiWorking').textContent=String(work).padStart(2,'0');$('kpiWorkRate').textContent=`${n?Math.round(work/n*100):0}%`;$('kpiProgress').textContent=`${avg}%`;$('sceneMode').textContent=`◌ ${n} AGENTS TRỰC TUYẾN`;}
+function refreshUi(){renderAgentList();updateDetail();updateKpis();}
+function selectAgent(id){if(!agents.some(a=>a.id===id))return;selected=id;refreshUi();}
+function assignTask(){const a=activeAgent();const task=$('newTask').value.trim();if(!a||!task)return;a.task=task;a.progress=0;a.status='working';a.speed=.28+Math.random()*.22;$('newTask').value='';addLog(`Nhận nhiệm vụ: ${task}`,a.name);refreshUi();}
+$('assignBtn').addEventListener('click',assignTask);$('newTask').addEventListener('keydown',e=>{if(e.key==='Enter')assignTask();});
+function resetAll(){if(ws&&ws.readyState<=1)ws.close();wsConnected=false;$('connIndicator').textContent='CHẾ ĐỘ DEMO';$('logMode').textContent='SIMULATED EVENTS';agents=cloneInitial();selected='lead';running=true;meeting=false;meetingEnd=0;liveExternal=false;$('pauseText').textContent='Tạm dừng';$('pauseIcon').textContent='Ⅱ';$('meetingBtnText').textContent='Họp nhanh';addLog('Đã khôi phục trạng thái demo');refreshUi();}
+function stopMeeting(){meeting=false;$('meetingBtnText').textContent='Họp nhanh';for(const a of agents){if(a.status==='meeting'){a.status=a.progress>=100?'done':a.task.startsWith('Chờ')?'idle':'working';}}addLog('Cuộc họp hoàn tất; các agent quay lại bàn làm việc');refreshUi();}
+function toggleMeeting(){if(meeting){stopMeeting();return;}meeting=true;meetingEnd=performance.now()+26000;$('meetingBtnText').textContent='Kết thúc họp';agents.forEach(a=>{a.preMeetingStatus=a.status;a.status='meeting';});addLog('Bắt đầu stand-up: 6 agent trao đổi tại bàn họp');refreshUi();}
+$('meetingBtn').addEventListener('click',toggleMeeting);
+$('pauseBtn').addEventListener('click',()=>{running=!running;$('pauseText').textContent=running?'Tạm dừng':'Tiếp tục';$('pauseIcon').textContent=running?'Ⅱ':'▶';addLog(running?'Đã tiếp tục mô phỏng':'Đã tạm dừng mô phỏng');});
+$('resetAllBtn').addEventListener('click',resetAll);
+$('resetViewBtn').addEventListener('click',()=>{orbit={yaw:Math.PI*.245,elev:.66,dist:23,targetX:0,targetY:.85,targetZ:0};addLog('Đã đặt lại góc nhìn 3D');});
+$('exportBtn').addEventListener('click',()=>{const state={application:'AgentSpace',exported_at:new Date().toISOString(),mode:wsConnected?'websocket':'demo',agents:agents.map(a=>({id:a.id,name:a.name,role:a.role,status:a.status,task:a.task,progress:Math.round(a.progress),position:{x:a.posX,z:a.posZ}}))};const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download='agentspace-state.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),3000);addLog('Đã xuất ảnh chụp trạng thái JSON');});
+$('currentClock').textContent=new Date().toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'});setInterval(()=>$('currentClock').textContent=new Date().toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'}),15000);
+const modal=$('connectModal');function setModal(open){modal.classList.toggle('show',open);if(open)$('socketUrl').focus();}
+$('openConnectBtn').onclick=()=>setModal(true);$('closeModalBtn').onclick=() => setModal(false);$('closeModalBottom').onclick=()=>setModal(false);modal.addEventListener('click',e=>{if(e.target===modal)setModal(false)});
+$('sendRealTask').onclick=()=>{const prompt=$('realTaskPrompt').value.trim();if(!wsConnected||!ws||!prompt){$('connectionStatus').textContent='Hãy kết nối Real Agent Server và nhập nhiệm vụ.';return;}ws.send(JSON.stringify({type:'task',prompt}));$('realTaskPrompt').value='';addLog('Đã gửi nhiệm vụ thật: '+prompt.slice(0,100),'Người quản lý');};
+$('disconnectBtn').onclick=()=>{if(ws)ws.close();wsConnected=false;liveExternal=false;$('connectionStatus').textContent='Đã ngắt kết nối. Mô phỏng tiếp tục hoạt động.';$('connIndicator').textContent='CHẾ ĐỘ DEMO';$('logMode').textContent='SIMULATED EVENTS';addLog('Đã ngắt kết nối WebSocket');};
+$('connectBtn').onclick=()=>{
+ const url=$('socketUrl').value.trim();if(!/^wss?:\/\//i.test(url)){$('connectionStatus').textContent='URL cần bắt đầu bằng ws:// hoặc wss://';return;}if(ws)ws.close();try{ws=new WebSocket(url);}catch(e){$('connectionStatus').textContent='Không thể mở kết nối: '+e.message;return;}
+ $('connectionStatus').textContent='Đang kết nối '+url+' ...';ws.onopen=()=>{wsConnected=true;liveExternal=true;$('connectionStatus').textContent='Đã kết nối. Đang nhận sự kiện agent.';$('connIndicator').textContent='WEBSOCKET ONLINE';$('logMode').textContent='LIVE + AGENT EVENTS';addLog('Đã kết nối agent bridge', 'WebSocket');};
+ ws.onmessage=e=>{let data;try{data=JSON.parse(e.data);}catch(_){return;}if(Array.isArray(data)){data.forEach(handleMessage);}else handleMessage(data);};
+ ws.onerror=()=>{$('connectionStatus').textContent='Kết nối lỗi. Kiểm tra endpoint và cấu hình WebSocket.'};
+ ws.onclose=()=>{if(wsConnected)addLog('Mất kết nối WebSocket; trở về chế độ demo', 'WebSocket');wsConnected=false;liveExternal=false;$('connIndicator').textContent='CHẾ ĐỘ DEMO';$('logMode').textContent='SIMULATED EVENTS';if($('connectionStatus').textContent.startsWith('Đã kết nối'))$('connectionStatus').textContent='Đã mất kết nối.';};
+};
+function handleMessage(data){if(!data||typeof data!=='object')return;
+ const type=data.type||'agent_update';if(type==='log'){addLog(String(data.message||''),String(data.source||'Bridge'));return;}
+ if(type==='agent_remove'){const i=agents.findIndex(a=>a.id===String(data.id));if(i>=0){const name=agents[i].name;agents.splice(i,1);if(selected===data.id)selected=agents[0]?.id;addLog('Đã rời khỏi văn phòng',name);refreshUi();}return;}
+ if(type!=='agent_update'&&type!=='agent_add')return;
+ const id=String(data.id??'').slice(0,48);if(!id)return;let a=agents.find(x=>x.id===id);
+ if(!a){if(agents.length>=12)return;const nth=agents.length;a={id,name:String(data.name||`Agent ${nth+1}`).slice(0,60),role:String(data.role||'Tác vụ tự động').slice(0,90),initial:String(data.initial||`A${nth+1}`).slice(0,3),color:/^#[0-9a-f]{6}$/i.test(data.color)?data.color:'#8fd8e9',status:'idle',task:'Chờ phân công',progress:0,speed:.3,x:Math.max(-6,Math.min(6,-6+nth*1.2)),z:4.65,desc:'Agent kết nối từ hệ thống bên ngoài.',animation:0,posX:0,posZ:0};a.posX=a.x;a.posZ=a.z;agents.push(a);addLog('Agent được thêm từ orchestration',a.name);}
+ if(typeof data.name==='string')a.name=data.name.slice(0,60);if(typeof data.role==='string')a.role=data.role.slice(0,90);if(typeof data.task==='string')a.task=data.task.slice(0,180);if(typeof data.desc==='string')a.desc=data.desc.slice(0,230);if(typeof data.status==='string'&&statusInfo[data.status])a.status=data.status;
+ if(Number.isFinite(Number(data.progress))&&data.progress!==undefined&&data.progress!==null)a.progress=Math.max(0,Math.min(100,Number(data.progress)));
+ if(Number.isFinite(data.x))a.x=Math.max(-6.6,Math.min(6.6,data.x));if(Number.isFinite(data.z))a.z=Math.max(-4.4,Math.min(4.5,data.z));refreshUi();
+}
+window.addEventListener('keydown',e=>{if(e.key==='Escape')setModal(false);if(e.target instanceof HTMLInputElement)return;if(e.code==='Space'){e.preventDefault();$('pauseBtn').click();}else if(e.key.toLowerCase()==='m')$('meetingBtn').click();else if(e.key.toLowerCase()==='r')$('resetViewBtn').click();else if(/^[1-9]$/.test(e.key)){const a=agents[Number(e.key)-1];if(a)selectAgent(a.id);}});
+
+/* 3D renderer: self-contained WebGL2; no frameworks, CDN, server or dependencies. */
+const canvas=$('world'),wrap=$('sceneWrap'),gl=canvas.getContext('webgl2',{alpha:false,antialias:true,depth:true,preserveDrawingBuffer:false});
+const ctx2d=gl?null:canvas.getContext('2d',{alpha:false});
+if(!gl){document.querySelector('.scene-badge').textContent='● 3D COMPATIBLE VIEW';addLog('Đã bật chế độ 3D tương thích (Canvas)');} 
+const VS=`#version 300 es
+in vec3 aPosition;in vec3 aNormal;in vec3 aColor;
+uniform mat4 uPV;uniform float uBrightness;
+out vec3 vColor;out float vFog;
+void main(){vec4 p=uPV*vec4(aPosition,1.);gl_Position=p;vec3 l=normalize(vec3(.4,.85,.65));float diffuse=max(dot(normalize(aNormal),l),0.);float light=.56+diffuse*.42;vColor=aColor*light*uBrightness;vFog=clamp((p.w-11.)/48.,0.,.40);}`;
+const FS=`#version 300 es
+precision highp float;in vec3 vColor;in float vFog;out vec4 outColor;
+void main(){vec3 c=mix(vColor,vec3(.055,.105,.17),vFog);outColor=vec4(pow(max(c,vec3(0.)),vec3(.93)),1.);}`;
+function makeShader(type,source){const shader=gl.createShader(type);gl.shaderSource(shader,source);gl.compileShader(shader);if(!gl.getShaderParameter(shader,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(shader));return shader;}
+let program,attrib,uniform,buf;
+if(gl){
+  program=gl.createProgram();gl.attachShader(program,makeShader(gl.VERTEX_SHADER,VS));gl.attachShader(program,makeShader(gl.FRAGMENT_SHADER,FS));gl.linkProgram(program);if(!gl.getProgramParameter(program,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(program));gl.useProgram(program);
+  attrib={pos:gl.getAttribLocation(program,'aPosition'),normal:gl.getAttribLocation(program,'aNormal'),color:gl.getAttribLocation(program,'aColor')};
+  uniform={pv:gl.getUniformLocation(program,'uPV'),brightness:gl.getUniformLocation(program,'uBrightness')};
+  buf=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buf);gl.enableVertexAttribArray(attrib.pos);gl.enableVertexAttribArray(attrib.normal);gl.enableVertexAttribArray(attrib.color);const stride=9*4;gl.vertexAttribPointer(attrib.pos,3,gl.FLOAT,false,stride,0);gl.vertexAttribPointer(attrib.normal,3,gl.FLOAT,false,stride,3*4);gl.vertexAttribPointer(attrib.color,3,gl.FLOAT,false,stride,6*4);gl.enable(gl.DEPTH_TEST);gl.disable(gl.CULL_FACE);
+}
+let verts=[];const colorCache=new Map();function rgb(hex){if(Array.isArray(hex))return hex;let v=colorCache.get(hex);if(!v){const n=parseInt(hex.replace('#',''),16);v=[((n>>16)&255)/255,((n>>8)&255)/255,(n&255)/255];colorCache.set(hex,v);}return v;}
+function vtx(p,n,c){verts.push(...p,...n,...c)}
+function tri(a,b,c,n,color){const col=rgb(color);vtx(a,n,col);vtx(b,n,col);vtx(c,n,col)}
+function quad(a,b,c,d,n,color){tri(a,b,c,n,color);tri(a,c,d,n,color);}
+function box(x,y,z,w,h,d,color,yaw=0){const hw=w/2,hh=h/2,hd=d/2,cs=Math.cos(yaw),sn=Math.sin(yaw);const coord=(a,b,c)=>[x+a*cs+c*sn,y+b,z-a*sn+c*cs];const norm=(a,b,c)=>[a*cs+c*sn,b,-a*sn+c*cs];const corners=[coord(-hw,-hh,-hd),coord(hw,-hh,-hd),coord(hw,hh,-hd),coord(-hw,hh,-hd),coord(-hw,-hh,hd),coord(hw,-hh,hd),coord(hw,hh,hd),coord(-hw,hh,hd)];const faces=[[4,5,6,7,norm(0,0,1)],[1,0,3,2,norm(0,0,-1)],[5,1,2,6,norm(1,0,0)],[0,4,7,3,norm(-1,0,0)],[7,6,2,3,norm(0,1,0)],[0,1,5,4,norm(0,-1,0)]];for(const f of faces)quad(corners[f[0]],corners[f[1]],corners[f[2]],corners[f[3]],f[4],color);}
+function cyl(x,y,z,r,h,color,segs=12){let y1=y-h/2,y2=y+h/2;for(let j=0;j<segs;j++){const a=j*2*Math.PI/segs,b=(j+1)*2*Math.PI/segs,xa=Math.cos(a)*r,za=Math.sin(a)*r,xb=Math.cos(b)*r,zb=Math.sin(b)*r;const na=[Math.cos((a+b)/2),0,Math.sin((a+b)/2)];quad([x+xa,y1,z+za],[x+xb,y1,z+zb],[x+xb,y2,z+zb],[x+xa,y2,z+za],na,color);tri([x,y2,z],[x+xa,y2,z+za],[x+xb,y2,z+zb],[0,1,0],color);tri([x,y1,z],[x+xb,y1,z+zb],[x+xa,y1,z+za],[0,-1,0],color);}}
+function sphere(x,y,z,r,color,lat=7,lon=10){for(let i=0;i<lat;i++){const a=-Math.PI/2+Math.PI*i/lat,b=-Math.PI/2+Math.PI*(i+1)/lat;for(let j=0;j<lon;j++){const c=2*Math.PI*j/lon,d=2*Math.PI*(j+1)/lon;const point=(phi,theta)=>[x+r*Math.cos(phi)*Math.cos(theta),y+r*Math.sin(phi),z+r*Math.cos(phi)*Math.sin(theta)];const norm=p=>[(p[0]-x)/r,(p[1]-y)/r,(p[2]-z)/r];const p=point(a,c),q=point(a,d),s=point(b,d),t=point(b,c);tri(p,q,t,norm(p),color);tri(q,s,t,norm(s),color);}}}
+function ring(x,y,z,r0,r1,color,segs=32){for(let i=0;i<segs;i++){let a=i*2*Math.PI/segs,b=(i+1)*2*Math.PI/segs;quad([x+r0*Math.cos(a),y,z+r0*Math.sin(a)],[x+r1*Math.cos(a),y,z+r1*Math.sin(a)],[x+r1*Math.cos(b),y,z+r1*Math.sin(b)],[x+r0*Math.cos(b),y,z+r0*Math.sin(b)],[0,1,0],color)}}
+function matMul(a,b){const out=new Float32Array(16);for(let c=0;c<4;c++)for(let r=0;r<4;r++)for(let k=0;k<4;k++)out[c*4+r]+=a[k*4+r]*b[c*4+k];return out;}
+function perspective(fov,aspect,near,far){const f=1/Math.tan(fov/2),o=new Float32Array(16);o[0]=f/aspect;o[5]=f;o[10]=(far+near)/(near-far);o[11]=-1;o[14]=2*far*near/(near-far);return o;}
+function lookAt(eye,target){const normalize=v=>{const len=Math.hypot(...v);return v.map(n=>n/len);};const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]],dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];const z=normalize(eye.map((v,i)=>v-target[i])),x=normalize(cross([0,1,0],z)),y=cross(z,x);return new Float32Array([x[0],y[0],z[0],0,x[1],y[1],z[1],0,x[2],y[2],z[2],0,-dot(x,eye),-dot(y,eye),-dot(z,eye),1]);}
+function project(x,y,z,m,width,height){const vx=m[0]*x+m[4]*y+m[8]*z+m[12],vy=m[1]*x+m[5]*y+m[9]*z+m[13],vw=m[3]*x+m[7]*y+m[11]*z+m[15];if(vw<=0)return null;return {x:(vx/vw*.5+.5)*width,y:(1-(vy/vw*.5+.5))*height,depth:vw};}
+function drawRoom(t){
+ // Ground, perimeter, checkerboard tiles
+ box(0,-.28,0,16.6,.5,12.3,'#25364b');box(0,-.012,0,16.45,.035,12.13,'#354a5b');
+ for(let x=-8;x<8;x+=1)for(let z=-5.9;z<5.95;z+=1)box(x+.5,.009,z+.5,.99,.008,.99,(Math.round(x+z)&1)?'#20364a':'#223b4e');
+ // light floor tiles and subtle neon zoning
+ for(let x=-7.6;x<8;x+=1.3){box(x,.015,5.67,.75,.01,.018,'#37727c');}box(0,.02,-5.6,15.3,.02,.045,'#538e94');box(-7.6,.035,0,.04,.06,11.4,'#5a988e');
+ // back wall, left wall, lower wall paneling
+ box(0,2.1,-6.1,16.6,4.1,.19,'#1c3040');box(-8.2,2.05,0,.18,4.0,12.25,'#1b2b3f');
+ box(0,.50,-5.97,16.4,.9,.07,'#172b37');box(-8.06,.50,0,.07,.9,11.9,'#17313c');
+ for(let x=-7.3;x<8;x+=3.8){box(x,2.65,-5.945,2.87,1.83,.05,'#25506a');box(x,2.68,-5.912,2.60,1.55,.045,'#31607d');box(x,2.65,-5.873,.05,1.78,.03,'#80abc4');box(x,3.5,-5.885,2.88,.05,.05,'#5791a3');}
+ for(let z=-4.7;z<5.9;z+=3.6){box(-8.045,2.7,z,.04,1.7,2.6,'#294b65');box(-8.014,2.7,z,.03,1.5,2.4,'#2b5c79');box(-7.98,2.7,z,.025,1.55,.05,'#629bb9')}
+ box(0,4.18,-5.91,16.1,.09,.1,'#77d1ba');box(-8.0,4.18,0,.1,.09,11.8,'#77d1ba');
+ // header wall sign: geometric luminous motif
+ box(-2.2,3.73,-5.82,3.6,.16,.03,'#9beac6');box(-2.2,3.98,-5.82,1.9,.08,.03,'#5b8da3');
+ // Vertical wall lighting
+ for(let x of [-7.7,-3.75,.1,3.95,7.8])box(x,2.25,-5.78,.05,1.6,.06,'#5498a8');
+ // Floor meeting area with segmented rings
+ ring(0,.055,.12,1.91,1.94,'#2e7781',32);ring(0,.06,.12,2.18,2.20,'#2a555f',32);
+ // meeting table
+ cyl(0,.48,.12,.40,.95,'#49606a',16);cyl(0,.91,.12,1.22,.13,'#718e8a',24);cyl(0,1.005,.12,1.17,.015,'#a0b6a4',24);
+ cyl(0,1.033,.12,.18,.025,'#d8ffe7',18);box(0,1.04,.12,.15,.02,.8,'#547f89');
+ // chairs around meeting room, pastel stools
+ for(let k=0;k<5;k++){const a=2*Math.PI*k/5+.6,x=Math.cos(a)*1.66,z=.12+Math.sin(a)*1.66;cyl(x,.42,z,.34,.7,'#344759',12);cyl(x,.80,z,.39,.1,'#526e80',12);}
+ // Lounge left/back
+ box(-5.8,.41,-4.7,2.4,.55,.9,'#4c5c77');box(-5.8,.93,-5.03,2.4,.65,.22,'#63748c');box(-6.9,.64,-4.7,.22,.60,.98,'#63748c');box(-4.7,.64,-4.7,.22,.60,.98,'#63748c');
+ // Book shelves in back/right
+ box(6.85,1.48,-5.41,1.3,2.85,.45,'#405367');for(let y of [.55,1.23,1.91,2.56])box(6.85,y,-5.12,1.45,.09,.58,'#7c927f');
+ for(let i=0;i<12;i++){const x=6.33+(i%4)*.32,y=.71+Math.floor(i/4)*.65;box(x,y,-5.07,.21,.34+.04*(i%3),.26,['#cc9bc6','#82bed0','#b8d597','#efb88f'][i%4]);}
+ // Potted plants
+ for(const [x,z,s] of [[-7.15,4.93,1],[7.25,4.90,1.06],[6.9,-4.3,.74],[-7.1,-2.1,.74]]){cyl(x,.22,z,.37*s,.43*s,'#be8d72',12);cyl(x,.45,z,.31*s,.065*s,'#d4a080',12);cyl(x,.92*s,z,.12*s,.83*s,'#6b9b76',9);for(let i=0;i<5;i++){let a=i*2*Math.PI/5+t*.05;const dx=Math.cos(a)*.39*s,dz=Math.sin(a)*.39*s;sphere(x+dx,.95*s+((i%2)*.14)*s,z+dz,.29*s,'#559d82',5,7);}sphere(x,1.24*s,z,.36*s,'#74c7a5',6,9);}
+ // Desk modules
+ for(let i=0;i<6;i++)drawDesk(initialAgents[i].x,initialAgents[i].z,i,t);
+}
+function drawDesk(x,z,i,t){
+ const isBack=i<3;const orient=isBack?1:-1;const deskZ=z+orient*(-.82);
+ // carpet under workstation
+ box(x,-.001,deskZ,3.42,.013,2.0,isBack?'#2b4250':'#28434c');
+ // desk legs, top, side trim
+ for(let dx of [-1.15,1.15])for(let dz of [-.41,.41])box(x+dx,.40,deskZ+dz,.11,.80,.11,'#627482');
+ box(x,.86,deskZ,2.76,.13,1.15,'#a1a995');box(x,.947,deskZ,2.75,.045,1.14,'#ccd0b6');
+ box(x,.84,deskZ+.575,2.75,.043,.03,'#62919a');
+ // monitor, luminous screen and narrow base facing viewer
+ box(x,.995,deskZ-orient*.10,.12,.17,.1,'#778c91');box(x,1.15,deskZ-orient*.10,.6,.055,.32,'#607987');
+ box(x,1.53,deskZ-orient*.24,1.10,.70,.10,'#142c3b');box(x,1.54,deskZ-orient*.182,1.0,.58,.026,['#4c7896','#467b90','#5d668f','#9c735a','#8d638a','#4f8b89'][i]);
+ for(let j=0;j<3;j++)box(x-.28,1.60-j*.11,deskZ-orient*.164,.37-j*.055,.022,.006,['#b0e9e6','#9bd1b1','#79acbe'][j]);
+ box(x,1.37,deskZ-orient*.155,.55,.045,.01,'#9fe7b6');
+ box(x,.98,deskZ+orient*.20,.67,.035,.24,'#586978');box(x+.97,.99,deskZ+orient*.18,.14,.05,.20,'#67818a');
+ // mug
+ cyl(x-1.04,1.07,deskZ-.28*orient,.105,.17,['#ffa788','#a7dafa','#c2b3ff','#ffbc89','#f7acd4','#9be6cc'][i],10);
+ // stools
+ const sz=z+(.48*orient);cyl(x,.34,sz,.34,.62,'#4a536c',12);cyl(x,.70,sz,.37,.12,['#66807c','#55748c','#6c658b','#8b7a72','#8b657f','#517b78'][i],12);
+ box(x,.89,sz+orient*.30,.68,.56,.13,'#567281');
+ // standing/accent floor screen
+ box(x-.99,.34,deskZ+(.80*orient),.03,.59,.03,'#4a7382');
+}
+const seats=[[ -1.8,-.9],[-.55,-1.85],[1.8,-.9],[-1.8,1.3],[.55,1.94],[1.8,1.3]];
+function drawAgent(a,i,t){
+ const meetingPos=seats[i%seats.length],tx=meeting?meetingPos[0]:a.x,tz=meeting?meetingPos[1]:a.z;
+ a.posX+=(tx-a.posX)*Math.min(.1,Math.max(.01,(running?1:.25)*.045));a.posZ+=(tz-a.posZ)*Math.min(.1,Math.max(.01,(running?1:.25)*.045));
+ const x=a.posX,z=a.posZ,focus=a.id===selected,st=statusInfo[a.status]||statusInfo.idle,bob=(a.status==='working'&&running?.028:0)*Math.sin(t*3+i);
+ // indicator under character
+ ring(x,.04,z,.38,.48,focus?'#d8ffb9':(a.status==='meeting'?'#6ccbd9':a.status==='done'?'#8b83ca':a.status==='idle'?'#936948':'#68a77a'),24);
+ if(focus){ring(x,.041,z,.54,.57,'#bafab3',26);ring(x,.045,z,.68,.70,'#427f70',26);}
+ // legs, shoes, body, arms, neck and head
+ for(let dx of [-.15,.15]){box(x+dx,.35+bob,z,.18,.63,.23,'#324251');box(x+dx,.085+bob,z+.10,.22,.14,.37,'#2b3747');}
+ box(x,.92+bob,z,.66,.72,.38,a.color);box(x,1.22+bob,z,.43,.09,.40,'#d9e9dd');
+ box(x-.43,.89+bob,z,.17,.65,.32,a.color, -.18);box(x+.43,.89+bob,z,.17,.65,.32,a.color,.18);
+ cyl(x,1.34+bob,z,.105,.17,'#a96c59',10);sphere(x,1.62+bob,z,.28,'#f1c7a8',8,11);
+ // hair cap
+ sphere(x,1.82+bob,z-.035,.224,['#293540','#342f43','#3b3b43','#5a3a3b','#3c3a44','#273b3f'][i%6],5,10);
+ // face details facing +z
+ sphere(x-.095,1.64+bob,z+.253,.024,'#273b3f',4,6);sphere(x+.095,1.64+bob,z+.253,.024,'#273b3f',4,6);
+ // headset and point light
+ box(x-.26,1.68+bob,z,.06,.2,.17,'#25384b');sphere(x-.28,1.61+bob,z,.08,'#8fcedf',5,7);
+ // subtle shoulder pin
+ sphere(x+.26,1.09+bob,z+.19,.055,st.color,5,7);
+ return [x,2.08+bob,z];
+}
+let lastSoftwareFrame=0;
+function drawSoftware3D(pv,w,h,dpr){
+  const ctx=ctx2d;if(!ctx)return;
+  const triangles=[];
+  // Convert 3D triangles to screen polygons and sort by distance to the camera.
+  for(let i=0;i<verts.length;i+=27){
+    const p=project(verts[i],verts[i+1],verts[i+2],pv,w,h),q=project(verts[i+9],verts[i+10],verts[i+11],pv,w,h),r=project(verts[i+18],verts[i+19],verts[i+20],pv,w,h);
+    if(!p||!q||!r)continue;
+    if(Math.max(p.x,q.x,r.x)<0||Math.min(p.x,q.x,r.x)>w||Math.max(p.y,q.y,r.y)<0||Math.min(p.y,q.y,r.y)>h)continue;
+    const light=Math.max(0,(verts[i+3]*.4+verts[i+4]*.85+verts[i+5]*.65)/1.025);
+    const shade=.56+.42*light;
+    const red=Math.min(255,Math.round(verts[i+6]*255*shade*1.14)),green=Math.min(255,Math.round(verts[i+7]*255*shade*1.14)),blue=Math.min(255,Math.round(verts[i+8]*255*shade*1.14));
+    triangles.push({p,q,r,depth:(p.depth+q.depth+r.depth)/3,color:`rgb(${red},${green},${blue})`});
+  }
+  triangles.sort((a,b)=>b.depth-a.depth);
+  ctx.setTransform(dpr,0,0,dpr,0,0);ctx.fillStyle='#091523';ctx.fillRect(0,0,w,h);
+  for(const o of triangles){ctx.fillStyle=o.color;ctx.beginPath();ctx.moveTo(o.p.x,o.p.y);ctx.lineTo(o.q.x,o.q.y);ctx.lineTo(o.r.x,o.r.y);ctx.closePath();ctx.fill();}
+}
+function render3D(now){
+ const dt=Math.min(.1,(now-lastTick)/1000);lastTick=now;const t=now/1000;
+ if(running&&!liveExternal&&!meeting){for(const a of agents){if(a.status==='working'&&a.progress<100){a.progress=Math.min(100,a.progress+dt*a.speed);if(a.progress>=100){a.status='done';addLog('Hoàn tất nhiệm vụ: '+a.task,a.name);}}}}
+ if(meeting&&now>=meetingEnd)stopMeeting();
+ if(now-lastUi>500){updateDetail();updateKpis();lastUi=now;}
+ const w=wrap.clientWidth,h=wrap.clientHeight,dpr=Math.min(window.devicePixelRatio||1,2);if(canvas.width!==Math.round(w*dpr)||canvas.height!==Math.round(h*dpr)){canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr);}
+ if(gl){gl.viewport(0,0,canvas.width,canvas.height);gl.clearColor(.035,.066,.11,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);}
+ const eye=[orbit.targetX+Math.cos(orbit.yaw)*orbit.dist*Math.cos(orbit.elev),orbit.targetY+orbit.dist*Math.sin(orbit.elev),orbit.targetZ+Math.sin(orbit.yaw)*orbit.dist*Math.cos(orbit.elev)];
+ const pv=matMul(perspective(Math.PI/3.5,w/h,.1,90),lookAt(eye,[orbit.targetX,orbit.targetY,orbit.targetZ]));
+ verts=[];drawRoom(t);const anchors=agents.map((a,i)=>drawAgent(a,i,t));
+ if(gl){gl.useProgram(program);gl.uniformMatrix4fv(uniform.pv,false,pv);gl.uniform1f(uniform.brightness,1.12);gl.bindBuffer(gl.ARRAY_BUFFER,buf);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(verts),gl.DYNAMIC_DRAW);gl.drawArrays(gl.TRIANGLES,0,verts.length/9);}
+ else if(now-lastSoftwareFrame>55){drawSoftware3D(pv,w,h,dpr);lastSoftwareFrame=now;}
+ if(now-lastSnapshot>30){const labels=$('labels');if(labels.children.length!==agents.length){labels.innerHTML='';for(const a of agents){const btn=document.createElement('button');btn.className='world-label';btn.dataset.id=a.id;btn.addEventListener('click',()=>selectAgent(btn.dataset.id));labels.appendChild(btn);}}
+ for(let i=0;i<agents.length;i++){const a=agents[i],p=project(...anchors[i],pv,w,h),node=labels.children[i],st=statusInfo[a.status]||statusInfo.idle;node.dataset.id=a.id;node.className='world-label'+(selected===a.id?' selected':'');node.style.setProperty('--status',st.color);node.style.left=(p?.x||0)+'px';node.style.top=(p?.y||0)+'px';node.style.display=(p&&p.x>=-70&&p.x<w+70&&p.y>=-60&&p.y<h+40)?'flex':'none';node.innerHTML=`<span class="label-dot"></span><span class="label-content"><strong>${escapeHTML(a.name)}</strong><span class="label-task">${st.label}</span></span>`;}
+ lastSnapshot=now;}
+ requestAnimationFrame(render3D);
+}
+// Mouse and touch orbit controls.
+canvas.addEventListener('pointerdown',e=>{if(e.button!==0&&e.pointerType==='mouse')return;isDragging=true;dragDistance=0;priorPointer=[e.clientX,e.clientY];canvas.classList.add('grabbing');canvas.setPointerCapture(e.pointerId);});
+canvas.addEventListener('pointermove',e=>{if(!isDragging||!priorPointer)return;const dx=e.clientX-priorPointer[0],dy=e.clientY-priorPointer[1];dragDistance+=Math.abs(dx)+Math.abs(dy);orbit.yaw+=dx*.006;orbit.elev=Math.max(.21,Math.min(1.31,orbit.elev+dy*.005));priorPointer=[e.clientX,e.clientY];});
+function endDrag(e){if(!isDragging)return;isDragging=false;canvas.classList.remove('grabbing');if(dragDistance<7){const rect=canvas.getBoundingClientRect();const sx=e.clientX-rect.left,sy=e.clientY-rect.top;let closest=null,distance=52;for(const a of agents){const node=[...$('labels').children].find(n=>n.dataset.id===a.id);if(!node||node.style.display==='none')continue;const px=parseFloat(node.style.left),py=parseFloat(node.style.top)+20;const d=Math.hypot(sx-px,sy-py);if(d<distance){closest=a;distance=d;}}if(closest)selectAgent(closest.id);}}
+canvas.addEventListener('pointerup',endDrag);canvas.addEventListener('pointercancel',endDrag);
+canvas.addEventListener('wheel',e=>{e.preventDefault();orbit.dist=Math.max(13,Math.min(36,orbit.dist+e.deltaY*.012));},{passive:false});
+canvas.addEventListener('dblclick',()=>{$('resetViewBtn').click()});
+addLog('Văn phòng 3D đã sẵn sàng · Chọn agent để thao tác');refreshUi();requestAnimationFrame(render3D);
+})();
+</script>
+</body>
+</html>
