@@ -5,8 +5,8 @@ import httpx
 from readonly_gateway import reconcile as replica_reconcile, fetch as replica_fetch
 from db_connector import reconcile_db, fetch_db
 from sqlserver_connector import reconcile as reconcile_sqlserver, fetch as fetch_sqlserver
-from fastapi import FastAPI, HTTPException, Header, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, HTTPException, Header, WebSocket, WebSocketDisconnect, Request
+from fastapi.responses import FileResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -23,7 +23,9 @@ if len(TOKEN)<24:
         raise RuntimeError('ADMIN_TOKEN must be at least 24 characters')
 
 app=FastAPI(title='AgentSpace ERP API',docs_url=None,redoc_url=None)
-app.mount('/static',StaticFiles(directory=BASE/'static'),name='static')
+if (BASE/'static').is_dir():
+    app.mount('/static',StaticFiles(directory=BASE/'static'),name='static')
+
 subscribers=set()
 lock=asyncio.Lock()
 SOURCE=os.getenv('ERP_SOURCE','replica')
@@ -111,23 +113,37 @@ class Decision(BaseModel):
  reason:str=Field(default='Đã xem xét và quyết định',min_length=3,max_length=1000)
 
 @app.get('/')
-async def home():return FileResponse(BASE/'static'/'index.html')
+@app.get('/index')
+@app.get('/api')
+@app.get('/api/index')
+@app.get('/api/index.py')
+async def home():
+    idx = BASE / 'static' / 'index.html'
+    if idx.is_file():
+        return FileResponse(idx)
+    return RedirectResponse(url='/static/index.html')
+
+@app.get('/erp/readonly/{domain}')
 @app.get('/api/erp/readonly/{domain}')
 async def erp_read(domain:str,authorization:str|None=Header(None)):
  auth(authorization)
  try: return {'source':SOURCE,'rows':fetch(domain)}
  except (ValueError,RuntimeError,sqlite3.Error) as ex:raise HTTPException(422,str(ex))
 
+@app.get('/erp/reconcile')
 @app.get('/api/erp/reconcile')
 async def erp_reconcile(authorization:str|None=Header(None)):
  auth(authorization)
  try:return reconcile()
  except (ValueError,RuntimeError,sqlite3.Error) as ex:raise HTTPException(422,str(ex))
 
+@app.get('/snapshot')
 @app.get('/api/snapshot')
 async def snapshot(authorization:str|None=Header(None)):
  auth(authorization)
  return {'jobs':rows('SELECT * FROM jobs ORDER BY created_at DESC LIMIT 50'),'steps':rows('SELECT * FROM steps ORDER BY created_at DESC LIMIT 150'),'approvals':rows('SELECT * FROM approvals ORDER BY created_at DESC LIMIT 100'),'events':rows('SELECT * FROM events ORDER BY id DESC LIMIT 100'),'records':rows('SELECT * FROM erp_records ORDER BY created_at DESC LIMIT 100'),'agents':ROLES}
+
+@app.post('/jobs',status_code=201)
 @app.post('/api/jobs',status_code=201)
 async def create_job(body:JobIn,authorization:str|None=Header(None)):
  auth(authorization);jid=str(uuid.uuid4())
@@ -138,6 +154,8 @@ async def create_job(body:JobIn,authorization:str|None=Header(None)):
  else:
   asyncio.create_task(process(jid))
  return {'id':jid,'status':'queued' if not os.getenv('VERCEL') else 'processed'}
+
+@app.post('/approvals/{approval_id}')
 @app.post('/api/approvals/{approval_id}')
 async def decide(approval_id:str,body:Decision,authorization:str|None=Header(None)):
  approval_token=os.getenv('APPROVER_TOKEN', TOKEN)
@@ -152,7 +170,9 @@ async def decide(approval_id:str,body:Decision,authorization:str|None=Header(Non
  reason_text = body.reason if body.reason else ('Phê duyệt' if body.approve else 'Từ chối')
  await event(a['job_id'],'approval',('Đã duyệt báo cáo; không ghi ERP' if body.approve else 'Đã từ chối')+'; lý do: '+reason_text[:200])
  return {'status':new,'erp_write':False}
+
 @app.websocket('/ws')
+@app.websocket('/api/ws')
 async def ws(websocket:WebSocket):
  token=websocket.query_params.get('token','')
  if not secrets.compare_digest(token,TOKEN):await websocket.close(code=1008);return
