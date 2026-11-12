@@ -322,6 +322,17 @@ async def decide(approval_id:str,body:Decision,authorization:str|None=Header(Non
  await event(a['job_id'],'approval',('Đã duyệt báo cáo; không ghi ERP' if body.approve else 'Đã từ chối')+'; lý do: '+reason_text[:200])
  return {'status':new,'erp_write':False}
 
+@app.get('/ws')
+@app.get('/api/ws')
+async def ws_get(request: Request):
+    if 'text/html' in request.headers.get('accept', ''):
+        return RedirectResponse(url='/')
+    return {
+        'service': 'AgentSpace ERP WebSocket Endpoint',
+        'protocol': 'WebSocket (wss://)',
+        'note': 'Đây là cổng kết nối WebSocket thời gian thực (wss://). Để sử dụng giao diện, vui lòng truy cập trang chủ tại /'
+    }
+
 @app.websocket('/ws')
 @app.websocket('/api/ws')
 async def ws(websocket:WebSocket):
