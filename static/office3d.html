@@ -71,15 +71,15 @@ button,input,select{font:inherit}button{cursor:pointer}button:disabled{opacity:.
 (()=>{'use strict';
 const $ = id=>document.getElementById(id);
 const initialAgents = [
- {id:'lead',name:'Lead Agent',role:'Điều phối & quản lý',initial:'LD',color:'#c5fb9b',status:'working',task:'Lập kế hoạch công việc hôm nay',progress:78,speed:.42,x:-5.05,z:-2.65,desc:'Điều phối công việc, phân bổ nguồn lực và tổng hợp kết quả từ các agent.'},
- {id:'research',name:'Research Agent',role:'Nghiên cứu & phân tích',initial:'RS',color:'#82c9fa',status:'working',task:'Nghiên cứu xu hướng thị trường',progress:46,speed:.28,x:0,z:-2.85,desc:'Thu thập, đối chiếu nguồn thông tin và tạo báo cáo nghiên cứu.'},
- {id:'dev',name:'Dev Agent',role:'Phát triển phần mềm',initial:'DV',color:'#b6a1ff',status:'working',task:'Phát triển backend & tích hợp API',progress:63,speed:.24,x:5.05,z:-2.65,desc:'Viết mã, kiểm thử tích hợp và xây dựng chức năng sản phẩm.'},
- {id:'design',name:'Design Agent',role:'Thiết kế & trải nghiệm',initial:'DS',color:'#ffbb8b',status:'working',task:'Thiết kế giao diện dashboard',progress:34,speed:.32,x:-5.05,z:2.75,desc:'Thiết kế UI/UX, nguyên mẫu trực quan và hướng dẫn giao diện.'},
- {id:'marketing',name:'Marketing Agent',role:'Nội dung & tăng trưởng',initial:'MK',color:'#ff96ca',status:'idle',task:'Chờ nhận kế hoạch chiến dịch',progress:0,speed:.29,x:0,z:3.05,desc:'Lên chiến lược nội dung, SEO, kế hoạch truyền thông và quảng bá.'},
- {id:'qa',name:'QA Agent',role:'Kiểm thử & đánh giá',initial:'QA',color:'#82f0d8',status:'done',task:'Hoàn tất bộ kiểm thử regression',progress:100,speed:.22,x:5.05,z:2.75,desc:'Kiểm tra chất lượng đầu ra và ghi nhận lỗi trước khi bàn giao.'}
+ {id:'manager',name:'Điều phối ERP',role:'Điều phối & phân công',initial:'DP',color:'#c5fb9b',status:'idle',task:'Sẵn sàng điều phối quy trình',progress:0,speed:.42,x:-5.05,z:-2.65,desc:'Điều phối luồng công việc, phân bổ tác vụ cho 6 vai trò Agent ERP.'},
+ {id:'finance',name:'Tài chính - KT',role:'Tài chính & kế toán',initial:'TC',color:'#82c9fa',status:'idle',task:'Rà soát chứng từ chi phí',progress:0,speed:.28,x:0,z:-2.85,desc:'Kiểm tra số dư, định khoản kế toán, phân tích hồ sơ thanh toán.'},
+ {id:'assets',name:'Quản trị tài sản',role:'Quản lý tài sản ERP',initial:'TS',color:'#b6a1ff',status:'idle',task:'Đối chiếu mã tài sản cố định',progress:0,speed:.24,x:5.05,z:-2.65,desc:'Kiểm kê tài sản, nguyên giá, giá trị còn lại và khấu hao.'},
+ {id:'hr',name:'Nhân sự (HR)',role:'Tổ chức & nhân sự',initial:'NS',color:'#ffbb8b',status:'idle',task:'Xác thực thẩm quyền nhân sự',progress:0,speed:.32,x:-5.05,z:2.75,desc:'Kiểm tra thẩm quyền phê duyệt, người đề xuất và phân bổ phòng ban.'},
+ {id:'security',name:'An toàn thông tin',role:'An toàn & bảo mật',initial:'AT',color:'#ff96ca',status:'idle',task:'Kiểm tra rủi ro an ninh dữ liệu',progress:0,speed:.29,x:0,z:3.05,desc:'Đánh giá rủi ro an ninh thông tin, tuân thủ chính sách bảo mật.'},
+ {id:'audit',name:'Kiểm soát nội bộ',role:'Kiểm toán & kiểm soát',initial:'KS',color:'#82f0d8',status:'idle',task:'Kiểm soát chéo & tổng hợp',progress:0,speed:.22,x:5.05,z:2.75,desc:'Kiểm soát chéo độc lập, phát hiện bất thường và lập báo cáo đối chiếu.'}
 ];
 const cloneInitial=()=>initialAgents.map(a=>({...a,posX:a.x,posZ:a.z,animation:Math.random()*7}));
-let agents=cloneInitial(),selected='lead',running=true,meeting=false,meetingEnd=0,ws=null,wsConnected=false,liveExternal=false,logs=[],lastTick=performance.now(),lastUi=0,lastSnapshot=0;
+let agents=cloneInitial(),selected='manager',running=true,meeting=false,meetingEnd=0,ws=null,wsConnected=false,liveExternal=false,logs=[],lastTick=performance.now(),lastUi=0,lastSnapshot=0;
 let orbit={yaw:Math.PI*.245,elev:.66,dist:23,targetX:0,targetY:.85,targetZ:0},isDragging=false,dragDistance=0,priorPointer=null;
 const statusInfo={working:{label:'Đang làm',color:'#c4ff83',bg:'#28472b55'},meeting:{label:'Đang họp',color:'#80dbff',bg:'#26476255'},idle:{label:'Chờ việc',color:'#ffbd7b',bg:'#51392355'},done:{label:'Hoàn thành',color:'#b6a5ff',bg:'#46386a55'},error:{label:'Lỗi',color:'#ff858d',bg:'#622d3b55'}};
 const logTime=()=>new Intl.DateTimeFormat('vi-VN',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(new Date());
@@ -106,17 +106,73 @@ $('resetAllBtn').addEventListener('click',resetAll);
 $('resetViewBtn').addEventListener('click',()=>{orbit={yaw:Math.PI*.245,elev:.66,dist:23,targetX:0,targetY:.85,targetZ:0};addLog('Đã đặt lại góc nhìn 3D');});
 $('exportBtn').addEventListener('click',()=>{const state={application:'AgentSpace',exported_at:new Date().toISOString(),mode:wsConnected?'websocket':'demo',agents:agents.map(a=>({id:a.id,name:a.name,role:a.role,status:a.status,task:a.task,progress:Math.round(a.progress),position:{x:a.posX,z:a.posZ}}))};const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download='agentspace-state.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),3000);addLog('Đã xuất ảnh chụp trạng thái JSON');});
 $('currentClock').textContent=new Date().toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'});setInterval(()=>$('currentClock').textContent=new Date().toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'}),15000);
-const modal=$('connectModal');function setModal(open){modal.classList.toggle('show',open);if(open)$('socketUrl').focus();}
+const modal=$('connectModal');
+function setModal(open){
+ modal.classList.toggle('show',open);
+ if(open){
+  const proto = location.protocol === 'https:' ? 'wss://' : 'ws://';
+  $('socketUrl').value = proto + location.host + '/ws?token=agentspace_demo_admin_token_secret_12345';
+  $('socketUrl').focus();
+ }
+}
 $('openConnectBtn').onclick=()=>setModal(true);$('closeModalBtn').onclick=() => setModal(false);$('closeModalBottom').onclick=()=>setModal(false);modal.addEventListener('click',e=>{if(e.target===modal)setModal(false)});
-$('sendRealTask').onclick=()=>{const prompt=$('realTaskPrompt').value.trim();if(!wsConnected||!ws||!prompt){$('connectionStatus').textContent='Hãy kết nối Real Agent Server và nhập nhiệm vụ.';return;}ws.send(JSON.stringify({type:'task',prompt}));$('realTaskPrompt').value='';addLog('Đã gửi nhiệm vụ thật: '+prompt.slice(0,100),'Người quản lý');};
+$('sendRealTask').onclick=async()=>{
+ const prompt=$('realTaskPrompt').value.trim();
+ if(!prompt){$('connectionStatus').textContent='Vui lòng nhập nhiệm vụ.';return;}
+ try{
+  $('connectionStatus').textContent='Đang gửi nhiệm vụ cho các Agent...';
+  let res=await fetch('/api/jobs',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer agentspace_demo_admin_token_secret_12345'},body:JSON.stringify({title:'Nhiệm vụ từ Văn phòng 3D',request:prompt,department:'expense'})});
+  let data=await res.json();
+  if(!res.ok) throw new Error(data.detail||res.status);
+  $('connectionStatus').textContent='Đã tiếp nhận nhiệm vụ: '+data.id;
+  $('realTaskPrompt').value='';
+  addLog('Đã giao việc: '+prompt.slice(0,90),'3D Office');
+ }catch(err){$('connectionStatus').textContent='Lỗi: '+err.message;}
+};
 $('disconnectBtn').onclick=()=>{if(ws)ws.close();wsConnected=false;liveExternal=false;$('connectionStatus').textContent='Đã ngắt kết nối. Mô phỏng tiếp tục hoạt động.';$('connIndicator').textContent='CHẾ ĐỘ DEMO';$('logMode').textContent='SIMULATED EVENTS';addLog('Đã ngắt kết nối WebSocket');};
 $('connectBtn').onclick=()=>{
  const url=$('socketUrl').value.trim();if(!/^wss?:\/\//i.test(url)){$('connectionStatus').textContent='URL cần bắt đầu bằng ws:// hoặc wss://';return;}if(ws)ws.close();try{ws=new WebSocket(url);}catch(e){$('connectionStatus').textContent='Không thể mở kết nối: '+e.message;return;}
- $('connectionStatus').textContent='Đang kết nối '+url+' ...';ws.onopen=()=>{wsConnected=true;liveExternal=true;$('connectionStatus').textContent='Đã kết nối. Đang nhận sự kiện agent.';$('connIndicator').textContent='WEBSOCKET ONLINE';$('logMode').textContent='LIVE + AGENT EVENTS';addLog('Đã kết nối agent bridge', 'WebSocket');};
- ws.onmessage=e=>{let data;try{data=JSON.parse(e.data);}catch(_){return;}if(Array.isArray(data)){data.forEach(handleMessage);}else handleMessage(data);};
- ws.onerror=()=>{$('connectionStatus').textContent='Kết nối lỗi. Kiểm tra endpoint và cấu hình WebSocket.'};
- ws.onclose=()=>{if(wsConnected)addLog('Mất kết nối WebSocket; trở về chế độ demo', 'WebSocket');wsConnected=false;liveExternal=false;$('connIndicator').textContent='CHẾ ĐỘ DEMO';$('logMode').textContent='SIMULATED EVENTS';if($('connectionStatus').textContent.startsWith('Đã kết nối'))$('connectionStatus').textContent='Đã mất kết nối.';};
+ $('connectionStatus').textContent='Đang kết nối '+url+' ...';
+ ws.onopen=()=>{wsConnected=true;liveExternal=true;$('connectionStatus').textContent='Đã kết nối trực tiếp WebSocket ERP Cloud.';$('connIndicator').textContent='WEBSOCKET ONLINE';$('logMode').textContent='LIVE + ERP EVENTS';addLog('Đã kết nối WebSocket ERP Cloud', 'WebSocket');};
+ ws.onmessage=e=>{let data;try{data=JSON.parse(e.data);}catch(_){return;}if(data.type==='event')handleErpEvent(data);else if(Array.isArray(data)){data.forEach(handleMessage);}else handleMessage(data);};
+ ws.onerror=()=>{$('connectionStatus').textContent='Kết nối lỗi. Hệ thống vẫn tự động đồng bộ qua dashboard.'};
+ ws.onclose=()=>{if(wsConnected)addLog('Mất kết nối WebSocket; trở về chế độ đồng bộ dashboard', 'WebSocket');wsConnected=false;liveExternal=false;$('connIndicator').textContent='CHẾ ĐỘ TỰ ĐỘNG';$('logMode').textContent='ERP SYNC';if($('connectionStatus').textContent.startsWith('Đã kết nối'))$('connectionStatus').textContent='Đã mất kết nối trực tiếp.';};
 };
+
+function handleErpEvent(ev){
+ if(!ev) return;
+ const detail = String(ev.detail||'');
+ const kind = String(ev.kind||'');
+ addLog(detail, 'ERP Cloud');
+ if(kind === 'agent'){
+  for(let a of agents){
+   if(detail.includes(a.name)||(a.id==='manager'&&detail.includes('Điều phối'))||(a.id==='finance'&&detail.includes('Tài chính'))||(a.id==='assets'&&detail.includes('tài sản'))||(a.id==='hr'&&detail.includes('Nhân sự'))||(a.id==='security'&&detail.includes('An toàn'))||(a.id==='audit'&&detail.includes('Kiểm soát'))){
+    if(detail.includes('đang thực hiện')){ a.status='working'; a.progress=50; a.task=detail; }
+    else if(detail.includes('hoàn thành')){ a.status='done'; a.progress=100; a.task='Đã hoàn thành bước phân tích'; }
+   }
+  }
+  refreshUi();
+ } else if(kind === 'approval'){
+  if(!meeting) toggleMeeting(true);
+ }
+}
+
+window.addEventListener('message', e => {
+ if(!e.data || typeof e.data !== 'object') return;
+ if(e.data.type === 'event') handleErpEvent(e.data);
+ else if(e.data.type === 'snapshot' && e.data.data){
+  let steps = e.data.data.steps || [];
+  for(let s of steps.slice(0, 12)){
+   let a = agents.find(x => x.id === s.agent);
+   if(a){
+    a.status = s.status === 'running' ? 'working' : (s.status === 'done' ? 'done' : a.status);
+    if(s.status === 'running') a.progress = 60;
+    if(s.status === 'done') a.progress = 100;
+   }
+  }
+  refreshUi();
+ }
+});
 function handleMessage(data){if(!data||typeof data!=='object')return;
  const type=data.type||'agent_update';if(type==='log'){addLog(String(data.message||''),String(data.source||'Bridge'));return;}
  if(type==='agent_remove'){const i=agents.findIndex(a=>a.id===String(data.id));if(i>=0){const name=agents[i].name;agents.splice(i,1);if(selected===data.id)selected=agents[0]?.id;addLog('Đã rời khỏi văn phòng',name);refreshUi();}return;}
