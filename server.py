@@ -23,6 +23,14 @@ if len(TOKEN)<24:
     else:
         raise RuntimeError('ADMIN_TOKEN must be at least 24 characters')
 
+RUNTIME_KEYS = {
+    'GEMINI_API_KEY': os.getenv('GEMINI_API_KEY', ''),
+    'OPENAI_API_KEY': os.getenv('OPENAI_API_KEY', ''),
+    'LLM_PROVIDER': os.getenv('LLM_PROVIDER', 'auto'),
+    'GEMINI_MODEL': os.getenv('GEMINI_MODEL', 'gemini-1.5-flash'),
+    'OPENAI_MODEL': os.getenv('OPENAI_MODEL', 'gpt-4.1-mini'),
+}
+
 app=FastAPI(title='AgentSpace ERP API',docs_url=None,redoc_url=None)
 
 # ASGI Middleware to restore original route path from Vercel rewrite query parameter
@@ -88,18 +96,67 @@ def status(job,value,result=None):
   if result is None:c.execute('UPDATE jobs SET status=?,updated_at=? WHERE id=?',(value,now(),job))
   else:c.execute('UPDATE jobs SET status=?,result=?,updated_at=? WHERE id=?',(value,result,now(),job))
 
-async def llm(agent,request,context):
+async def llm(agent, request, context, job_config=None):
+ job_config = job_config or {}
  if SOURCE=='sqlserver' and os.getenv('ALLOW_ERP_DATA_TO_LLM','false').lower()!='true':
   raise RuntimeError('External AI processing of ERP data disabled; set ALLOW_ERP_DATA_TO_LLM=true only after data protection review')
- key=os.getenv('OPENAI_API_KEY')
- if not key:raise RuntimeError('OPENAI_API_KEY is not configured; task cannot execute')
- prompt=f'Bạn là agent {agent} trong hệ thống ERP đại học. Chỉ phân tích thông tin cung cấp, không khẳng định đã cập nhật ERP thật. Phân biệt dữ liệu mẫu và dữ liệu thực. Viết tiếng Việt, ngắn gọn, có đề xuất và rủi ro.'
- async with httpx.AsyncClient(timeout=75) as client:
-  response=await client.post('https://api.openai.com/v1/chat/completions',headers={'Authorization':'Bearer '+key},json={'model':os.getenv('OPENAI_MODEL','gpt-4.1-mini'),'messages':[{'role':'system','content':prompt},{'role':'user','content':json.dumps({'request':request,'context':context},ensure_ascii=False)[:18000]}]})
-  response.raise_for_status()
-  return response.json()['choices'][0]['message']['content']
 
-async def process(job):
+ g_key = (job_config.get('gemini_key') or RUNTIME_KEYS.get('GEMINI_API_KEY') or os.getenv('GEMINI_API_KEY', '')).strip()
+ o_key = (job_config.get('openai_key') or RUNTIME_KEYS.get('OPENAI_API_KEY') or os.getenv('OPENAI_API_KEY', '')).strip()
+ prov = (job_config.get('llm_provider') or RUNTIME_KEYS.get('LLM_PROVIDER') or os.getenv('LLM_PROVIDER', 'auto')).strip().lower()
+
+ if prov == 'gemini':
+  active_provider = 'gemini'
+ elif prov == 'openai':
+  active_provider = 'openai'
+ else: # auto
+  if g_key: active_provider = 'gemini'
+  elif o_key: active_provider = 'openai'
+  else:
+   raise RuntimeError('Chưa có API Key. Vui lòng nhập Gemini API Key hoặc OpenAI API Key trên bảng điều khiển hoặc cấu hình biến môi trường.')
+
+ prompt = f'Bạn là agent {agent} trong hệ thống ERP đại học. Chỉ phân tích thông tin cung cấp, không khẳng định đã cập nhật ERP thật. Phân biệt dữ liệu mẫu và dữ liệu thực. Viết tiếng Việt, ngắn gọn, có đề xuất và rủi ro.'
+ user_payload = json.dumps({'request': request, 'context': context}, ensure_ascii=False)[:18000]
+
+ if active_provider == 'gemini':
+  if not g_key:
+   raise RuntimeError('GEMINI_API_KEY chưa được cấu hình; vui lòng nhập Key tại bảng điều khiển.')
+  model = (job_config.get('gemini_model') or RUNTIME_KEYS.get('GEMINI_MODEL') or os.getenv('GEMINI_MODEL', 'gemini-1.5-flash')).strip()
+  url = f'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={g_key}'
+  body = {
+   "system_instruction": {"parts": [{"text": prompt}]},
+   "contents": [{"role": "user", "parts": [{"text": user_payload}]}],
+   "generationConfig": {"temperature": 0.2}
+  }
+  async with httpx.AsyncClient(timeout=75) as client:
+   resp = await client.post(url, headers={'Content-Type': 'application/json'}, json=body)
+   if resp.status_code != 200:
+    try: err = resp.json().get('error', {}).get('message', resp.text)
+    except Exception: err = resp.text
+    raise RuntimeError(f'Lỗi Gemini ({model}) [{resp.status_code}]: {err[:250]}')
+   data = resp.json()
+   candidates = data.get('candidates', [])
+   if not candidates: raise RuntimeError(f'Gemini không trả về kết quả: {str(data)[:200]}')
+   parts = candidates[0].get('content', {}).get('parts', [])
+   if not parts or 'text' not in parts[0]: raise RuntimeError(f'Phản hồi Gemini không có text hợp lệ: {str(data)[:200]}')
+   return parts[0]['text']
+ else:
+  if not o_key:
+   raise RuntimeError('OPENAI_API_KEY chưa được cấu hình; vui lòng nhập Key tại bảng điều khiển.')
+  model = (job_config.get('openai_model') or RUNTIME_KEYS.get('OPENAI_MODEL') or os.getenv('OPENAI_MODEL', 'gpt-4.1-mini')).strip()
+  async with httpx.AsyncClient(timeout=75) as client:
+   resp = await client.post('https://api.openai.com/v1/chat/completions',
+    headers={'Authorization': f'Bearer {o_key}'},
+    json={'model': model, 'messages': [{'role': 'system', 'content': prompt}, {'role': 'user', 'content': user_payload}]}
+   )
+   if resp.status_code != 200:
+    try: err = resp.json().get('error', {}).get('message', resp.text)
+    except Exception: err = resp.text
+    raise RuntimeError(f'Lỗi OpenAI ({model}) [{resp.status_code}]: {err[:250]}')
+   return resp.json()['choices'][0]['message']['content']
+
+async def process(job, job_config=None):
+ job_config = job_config or {}
  async with lock:
   jobrow=rows('SELECT * FROM jobs WHERE id=?',(job,))[0]
   status(job,'running');await event(job,'workflow','Bắt đầu xử lý')
@@ -111,7 +168,7 @@ async def process(job):
    step=str(uuid.uuid4())
    with db() as c:c.execute('INSERT INTO steps(id,job_id,agent,status,created_at) VALUES(?,?,?,?,?)',(step,job,agent,'running',now()))
    await event(job,'agent',f'{label}: đang thực hiện')
-   try: output=await llm(label,jobrow['request'],context)
+   try: output=await llm(label,jobrow['request'],context,job_config)
    except Exception as ex:
     with db() as c:c.execute('UPDATE steps SET status=?,output=? WHERE id=?',('failed',str(ex)[:500],step))
     status(job,'failed');await event(job,'error',f'{label}: {str(ex)[:180]}');return
@@ -127,6 +184,19 @@ class JobIn(BaseModel):
  title:str=Field(min_length=3,max_length=160)
  request:str=Field(min_length=10,max_length=4000)
  department:str=Field(default='expense',pattern='^(expense|asset|hr)$')
+ llm_provider:str|None=None
+ gemini_key:str|None=None
+ openai_key:str|None=None
+ gemini_model:str|None=None
+ openai_model:str|None=None
+
+class SettingsIn(BaseModel):
+ llm_provider:str|None=None
+ gemini_key:str|None=None
+ openai_key:str|None=None
+ gemini_model:str|None=None
+ openai_model:str|None=None
+
 class Decision(BaseModel):
  approve:bool
  reason:str=Field(default='Đã xem xét và quyết định',min_length=3,max_length=1000)
@@ -157,7 +227,59 @@ async def erp_reconcile(authorization:str|None=Header(None)):
 @app.get('/api/snapshot')
 async def snapshot(authorization:str|None=Header(None)):
  auth(authorization)
- return {'jobs':rows('SELECT * FROM jobs ORDER BY created_at DESC LIMIT 50'),'steps':rows('SELECT * FROM steps ORDER BY created_at DESC LIMIT 150'),'approvals':rows('SELECT * FROM approvals ORDER BY created_at DESC LIMIT 100'),'events':rows('SELECT * FROM events ORDER BY id DESC LIMIT 100'),'records':rows('SELECT * FROM erp_records ORDER BY created_at DESC LIMIT 100'),'agents':ROLES}
+ g_key = RUNTIME_KEYS['GEMINI_API_KEY'] or os.getenv('GEMINI_API_KEY', '')
+ o_key = RUNTIME_KEYS['OPENAI_API_KEY'] or os.getenv('OPENAI_API_KEY', '')
+ return {
+  'jobs':rows('SELECT * FROM jobs ORDER BY created_at DESC LIMIT 50'),
+  'steps':rows('SELECT * FROM steps ORDER BY created_at DESC LIMIT 150'),
+  'approvals':rows('SELECT * FROM approvals ORDER BY created_at DESC LIMIT 100'),
+  'events':rows('SELECT * FROM events ORDER BY id DESC LIMIT 100'),
+  'records':rows('SELECT * FROM erp_records ORDER BY created_at DESC LIMIT 100'),
+  'agents':ROLES,
+  'ai_status': {
+    'provider': RUNTIME_KEYS['LLM_PROVIDER'],
+    'has_gemini_key': bool(g_key),
+    'has_openai_key': bool(o_key),
+    'gemini_model': RUNTIME_KEYS['GEMINI_MODEL'],
+    'openai_model': RUNTIME_KEYS['OPENAI_MODEL']
+  }
+ }
+
+@app.get('/settings')
+@app.get('/api/settings')
+async def get_settings(authorization:str|None=Header(None)):
+ auth(authorization)
+ g_key = RUNTIME_KEYS['GEMINI_API_KEY'] or os.getenv('GEMINI_API_KEY', '')
+ o_key = RUNTIME_KEYS['OPENAI_API_KEY'] or os.getenv('OPENAI_API_KEY', '')
+ return {
+  'provider': RUNTIME_KEYS['LLM_PROVIDER'],
+  'has_gemini_key': bool(g_key),
+  'gemini_key_masked': (g_key[:6] + '...' + g_key[-4:]) if len(g_key) > 10 else ('Đã cấu hình' if g_key else ''),
+  'has_openai_key': bool(o_key),
+  'openai_key_masked': (o_key[:6] + '...' + o_key[-4:]) if len(o_key) > 10 else ('Đã cấu hình' if o_key else ''),
+  'gemini_model': RUNTIME_KEYS['GEMINI_MODEL'],
+  'openai_model': RUNTIME_KEYS['OPENAI_MODEL']
+ }
+
+@app.post('/settings')
+@app.post('/api/settings')
+async def update_settings(body:SettingsIn,authorization:str|None=Header(None)):
+ auth(authorization)
+ if body.gemini_key is not None: RUNTIME_KEYS['GEMINI_API_KEY'] = body.gemini_key.strip()
+ if body.openai_key is not None: RUNTIME_KEYS['OPENAI_API_KEY'] = body.openai_key.strip()
+ if body.llm_provider: RUNTIME_KEYS['LLM_PROVIDER'] = body.llm_provider.strip().lower()
+ if body.gemini_model: RUNTIME_KEYS['GEMINI_MODEL'] = body.gemini_model.strip()
+ if body.openai_model: RUNTIME_KEYS['OPENAI_MODEL'] = body.openai_model.strip()
+ g_key = RUNTIME_KEYS['GEMINI_API_KEY'] or os.getenv('GEMINI_API_KEY', '')
+ o_key = RUNTIME_KEYS['OPENAI_API_KEY'] or os.getenv('OPENAI_API_KEY', '')
+ return {
+  'status': 'updated',
+  'provider': RUNTIME_KEYS['LLM_PROVIDER'],
+  'has_gemini_key': bool(g_key),
+  'has_openai_key': bool(o_key),
+  'gemini_model': RUNTIME_KEYS['GEMINI_MODEL'],
+  'openai_model': RUNTIME_KEYS['OPENAI_MODEL']
+ }
 
 @app.post('/jobs',status_code=201)
 @app.post('/api/jobs',status_code=201)
@@ -165,10 +287,23 @@ async def create_job(body:JobIn,authorization:str|None=Header(None)):
  auth(authorization);jid=str(uuid.uuid4())
  with db() as c:c.execute('INSERT INTO jobs(id,title,request,department,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?)',(jid,body.title,body.request,body.department,'queued',now(),now()))
  await event(jid,'workflow','Đã tiếp nhận công việc')
+
+ job_config = {
+  'gemini_key': body.gemini_key,
+  'openai_key': body.openai_key,
+  'llm_provider': body.llm_provider,
+  'gemini_model': body.gemini_model,
+  'openai_model': body.openai_model
+ }
+ if body.gemini_key: RUNTIME_KEYS['GEMINI_API_KEY'] = body.gemini_key.strip()
+ if body.openai_key: RUNTIME_KEYS['OPENAI_API_KEY'] = body.openai_key.strip()
+ if body.llm_provider: RUNTIME_KEYS['LLM_PROVIDER'] = body.llm_provider.strip().lower()
+ if body.gemini_model: RUNTIME_KEYS['GEMINI_MODEL'] = body.gemini_model.strip()
+
  if os.getenv('VERCEL') or os.getenv('SYNC_PROCESS', '').lower() == 'true':
-  await process(jid)
+  await process(jid, job_config)
  else:
-  asyncio.create_task(process(jid))
+  asyncio.create_task(process(jid, job_config))
  return {'id':jid,'status':'queued' if not os.getenv('VERCEL') else 'processed'}
 
 @app.post('/approvals/{approval_id}')
